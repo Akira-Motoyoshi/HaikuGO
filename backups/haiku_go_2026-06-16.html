@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>俳句GO — 場所が俳句になる地図</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Serif JP', serif;
+      background: #0a0a0f;
+      color: #e8e0d0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #map {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0; left: 0;
+    }
+
+    #ui {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #header {
+      pointer-events: all;
+      padding: 22px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(10,10,15,0.88) 0%, transparent 100%);
+    }
+
+    .logo-main {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      color: #e8d9a0;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: #7a7060;
+      margin-top: 3px;
+    }
+
+    .header-desc {
+      font-size: 11px;
+      color: #5a5448;
+      letter-spacing: 0.2em;
+      text-align: right;
+      line-height: 1.9;
+    }
+
+    #legend {
+      position: absolute;
+      top: 90px;
+      right: 28px;
+      pointer-events: all;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: #5a5448;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: #4a4538;
+      white-space: nowrap;
+      transition: opacity 0.5s;
+    }
+    #hint.hidden { opacity: 0; }
+
+    #card {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      width: min(460px, 90vw);
+      background: rgba(10, 9, 16, 0.92);
+      border: 1px solid rgba(232, 217, 160, 0.18);
+      border-radius: 2px;
+      padding: 28px 32px 24px;
+      backdrop-filter: blur(14px);
+      opacity: 0;
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      pointer-events: none;
+    }
+
+    #card.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: all;
+    }
+
+    .card-location {
+      font-size: 10px;
+      letter-spacing: 0.42em;
+      color: #7a7060;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .card-haiku {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 21px;
+      line-height: 2.3;
+      color: #e8d9a0;
+      letter-spacing: 0.12em;
+      border-left: 2px solid rgba(232, 217, 160, 0.35);
+      padding-left: 18px;
+      margin-bottom: 20px;
+    }
+
+    .card-author {
+      font-size: 11px;
+      color: #5a5448;
+      letter-spacing: 0.32em;
+      margin-bottom: 18px;
+    }
+
+    .card-theme {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: #e8d9a0;
+      border: 1px solid rgba(232, 217, 160, 0.28);
+      padding: 4px 14px;
+    }
+
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .okashi-button {
+      min-height: 28px;
+      border: 1px solid rgba(232, 217, 160, 0.24);
+      border-radius: 999px;
+      background: rgba(232, 217, 160, 0.06);
+      color: #7a7060;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 4px 13px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+
+    .okashi-button:hover,
+    .okashi-button.liked {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.48);
+      background: rgba(232, 217, 160, 0.12);
+    }
+
+    .card-close {
+      position: absolute;
+      top: 14px; right: 18px;
+      background: none;
+      border: none;
+      color: #5a5448;
+      font-size: 18px;
+      cursor: pointer;
+      transition: color 0.2s;
+      pointer-events: all;
+    }
+    .card-close:hover { color: #e8d9a0; }
+
+    .mapboxgl-ctrl-bottom-left,
+    .mapboxgl-ctrl-bottom-right { opacity: 0.4; }
+    .mapboxgl-ctrl-top-right { display: none; }
+
+    .haiku-marker {
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+    }
+
+    .draft-marker {
+      pointer-events: none;
+      filter: drop-shadow(0 0 10px rgba(232, 217, 160, 0.55));
+    }
+
+    #compose-toggle {
+      position: absolute;
+      top: 154px;
+      left: 28px;
+      pointer-events: all;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      color: #e8d9a0;
+      background: rgba(10, 9, 16, 0.78);
+      border: 1px solid rgba(232, 217, 160, 0.26);
+      border-radius: 2px;
+      padding: 10px 16px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    #compose-toggle:hover,
+    #compose-toggle.active {
+      background: rgba(10, 9, 16, 0.94);
+      border-color: rgba(232, 217, 160, 0.48);
+    }
+
+    #compose {
+      position: absolute;
+      top: 204px;
+      left: 28px;
+      width: min(368px, calc(100vw - 56px));
+      max-height: calc(100vh - 244px);
+      overflow: auto;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(10px);
+      background: rgba(10, 9, 16, 0.92);
+      border: 1px solid rgba(232, 217, 160, 0.18);
+      border-radius: 2px;
+      padding: 22px 22px 20px;
+      backdrop-filter: blur(14px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    #compose.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .compose-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .compose-title {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 18px;
+      letter-spacing: 0.22em;
+      color: #e8d9a0;
+    }
+
+    .compose-close {
+      background: none;
+      border: none;
+      color: #5a5448;
+      font-size: 18px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .compose-close:hover { color: #e8d9a0; }
+
+    .compose-field {
+      display: block;
+      margin-bottom: 13px;
+    }
+
+    .compose-field span,
+    .category-field legend {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: #7a7060;
+      margin-bottom: 7px;
+    }
+
+    .compose-field input,
+    .compose-field textarea {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid rgba(232, 217, 160, 0.16);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.22);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      padding: 9px 10px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .compose-field input:focus,
+    .compose-field textarea:focus {
+      background: rgba(0, 0, 0, 0.34);
+      border-color: rgba(232, 217, 160, 0.42);
+    }
+
+    .compose-field input::placeholder,
+    .compose-field textarea::placeholder { color: #4a4538; }
+
+    .haiku-lines {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .haiku-lines .compose-field { margin-bottom: 0; }
+
+    #syllable-meter {
+      min-height: 17px;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: #4a4538;
+      margin-bottom: 14px;
+    }
+
+    #syllable-meter.good { color: #e8d9a0; }
+
+    .compose-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .category-field {
+      border: 0;
+      margin: 2px 0 15px;
+    }
+
+    .category-options {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .category-options label {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 35px;
+      border: 1px solid rgba(232, 217, 160, 0.14);
+      color: #5a5448;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .category-options input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .category-options .swatch {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 7px;
+    }
+
+    .category-options label:has(input:checked) {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.36);
+      background: rgba(232, 217, 160, 0.04);
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .location-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .location-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    #pick-location,
+    #current-location,
+    #search-location,
+    .compose-submit {
+      font-family: 'Noto Serif JP', serif;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    #pick-location,
+    #current-location,
+    #search-location {
+      min-height: 36px;
+      border: 1px solid rgba(144, 196, 232, 0.34);
+      background: rgba(144, 196, 232, 0.07);
+      color: #90c4e8;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 0 12px;
+    }
+
+    #search-location {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.28);
+      background: rgba(232, 217, 160, 0.07);
+      white-space: nowrap;
+    }
+
+    #pick-location.active {
+      border-color: rgba(232, 217, 160, 0.58);
+      color: #e8d9a0;
+      background: rgba(232, 217, 160, 0.08);
+    }
+
+    #compose-coords {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      line-height: 1.7;
+      color: #4a4538;
+      min-width: 0;
+      word-break: break-all;
+    }
+
+    #compose-message {
+      min-height: 18px;
+      color: #7a7060;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    #compose-message.warn { color: #e8a0a0; }
+
+    .compose-submit {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid rgba(232, 217, 160, 0.35);
+      background: rgba(232, 217, 160, 0.1);
+      color: #e8d9a0;
+      font-size: 11px;
+      letter-spacing: 0.34em;
+    }
+
+    .compose-submit:hover {
+      background: rgba(232, 217, 160, 0.16);
+      border-color: rgba(232, 217, 160, 0.56);
+    }
+
+    body.picking-location #map { cursor: crosshair; }
+
+    @media (max-width: 720px) {
+      #header {
+        padding: 18px 20px;
+        align-items: flex-start;
+      }
+
+      .logo-main { font-size: 24px; }
+      .header-desc { display: none; }
+
+      #legend {
+        top: 86px;
+        right: 20px;
+        gap: 8px;
+      }
+
+      #compose-toggle {
+        top: 88px;
+        left: 20px;
+      }
+
+      #compose {
+        top: 138px;
+        left: 20px;
+        width: calc(100vw - 40px);
+        max-height: calc(100vh - 190px);
+      }
+
+      .haiku-lines,
+      .compose-grid,
+      .location-actions,
+      .search-row {
+        grid-template-columns: 1fr;
+      }
+
+      #card {
+        bottom: 26px;
+        padding: 26px 24px 22px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="ui">
+  <div id="header">
+    <div>
+      <div class="logo-main">俳句GO</div>
+      <div class="logo-sub">HAIKU × PLACE</div>
+    </div>
+    <div class="header-desc">
+      場所が俳句になる。<br>
+      ピンをクリックして、その土地の言葉を読む。
+    </div>
+  </div>
+
+  <div id="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#e8d9a0;"></div>
+      <span>自然・景色</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#90c4e8;"></div>
+      <span>水・海・川</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#e8a0a0;"></div>
+      <span>都市・人</span>
+    </div>
+  </div>
+
+  <button id="compose-toggle" type="button" aria-expanded="false" aria-controls="compose">＋ 詠む</button>
+
+  <form id="compose" aria-label="俳句投稿フォーム">
+    <div class="compose-head">
+      <div class="compose-title">一句を置く</div>
+      <button class="compose-close" type="button" aria-label="閉じる">✕</button>
+    </div>
+
+    <label class="compose-field">
+      <span>地名</span>
+      <input id="compose-name" type="text" placeholder="隅田川 / 東京都" required>
+    </label>
+
+    <div class="haiku-lines">
+      <label class="compose-field">
+        <span>上五</span>
+        <input id="compose-line-1" type="text" required>
+      </label>
+      <label class="compose-field">
+        <span>中七</span>
+        <input id="compose-line-2" type="text" required>
+      </label>
+      <label class="compose-field">
+        <span>下五</span>
+        <input id="compose-line-3" type="text" required>
+      </label>
+    </div>
+
+    <div id="syllable-meter">0 / 0 / 0</div>
+
+    <div class="compose-grid">
+      <label class="compose-field">
+        <span>作者</span>
+        <input id="compose-author" type="text" placeholder="無名">
+      </label>
+      <label class="compose-field">
+        <span>季・題</span>
+        <input id="compose-theme" type="text" placeholder="春・川" required>
+      </label>
+    </div>
+
+    <fieldset class="category-field">
+      <legend>カテゴリ</legend>
+      <div class="category-options">
+        <label>
+          <input type="radio" name="compose-category" value="nature" data-color="#e8d9a0" checked>
+          <span class="swatch" style="background:#e8d9a0;"></span>自然
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="water" data-color="#90c4e8">
+          <span class="swatch" style="background:#90c4e8;"></span>水辺
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="urban" data-color="#e8a0a0">
+          <span class="swatch" style="background:#e8a0a0;"></span>都市
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="life" data-color="#e8a0a0">
+          <span class="swatch" style="background:#e8a0a0;"></span>生活
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="leisure" data-color="#e8d9a0">
+          <span class="swatch" style="background:#e8d9a0;"></span>娯楽
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="compose-field">
+      <span>場所検索</span>
+      <div class="search-row">
+        <input id="place-search" type="text" placeholder="例：鎌倉市、隅田川、銀座">
+        <button id="search-location" type="button">検索</button>
+      </div>
+    </div>
+
+    <div class="location-row">
+      <div class="location-actions">
+        <button id="pick-location" type="button">地図で選ぶ</button>
+        <button id="current-location" type="button">現在地で詠む</button>
+      </div>
+      <div id="compose-coords">座標未選択</div>
+    </div>
+
+    <div id="compose-message" aria-live="polite"></div>
+    <button class="compose-submit" type="submit">ピンを立てる</button>
+  </form>
+
+  <div id="hint">ピンをクリックすると俳句が読めます</div>
+
+  <div id="card">
+    <button class="card-close" onclick="closeCard()">✕</button>
+    <div class="card-location" id="card-location"></div>
+    <div class="card-haiku" id="card-haiku"></div>
+    <div class="card-author" id="card-author"></div>
+    <div class="card-meta-row">
+      <div class="card-theme" id="card-theme"></div>
+      <button class="okashi-button" id="okashi-button" type="button" aria-pressed="false">
+        をかし <span id="okashi-count">0</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiYWtpLWFvZ2FrdSIsImEiOiJjbXA5cW0zaHcwbGZkMnBvZ2RleTM5b2sxIn0.7Gj-P35EuhV7W7iMhN6Plw';
+
+const STORAGE_KEY = 'haiku_go_local_pins_v1';
+const OKASHI_STORAGE_KEY = 'haiku_go_okashi_counts_v1';
+const OKASHI_LIKED_KEY = 'haiku_go_okashi_liked_v1';
+const CATEGORY_OPTIONS = {
+  nature: { label: '自然', color: '#e8d9a0' },
+  water: { label: '水辺', color: '#90c4e8' },
+  urban: { label: '都市', color: '#e8a0a0' },
+  life: { label: '生活', color: '#e8a0a0' },
+  leisure: { label: '娯楽', color: '#e8d9a0' },
+};
+const PIN_COLORS = [...new Set(Object.values(CATEGORY_OPTIONS).map(category => category.color))];
+const VERIFY_ONLY = new URLSearchParams(window.location.search).has('verify');
+
+const haikuData = [
+  // --- 既存10カ所 ---
+  { name: "松島 / 宮城県", lng: 141.0694, lat: 38.3627, haiku: "松島や\nああ松島や\n松島や", author: "— 松尾芭蕉（伝）", theme: "景・海", color: "#90c4e8" },
+  { name: "丹後 / 京都府", lng: 135.2, lat: 35.6, haiku: "春の海\nひねもすのたり\nのたりかな", author: "— 与謝蕪村", theme: "春・海", color: "#90c4e8" },
+  { name: "法隆寺 / 奈良県", lng: 135.7345, lat: 34.6147, haiku: "柿食えば\n鐘が鳴るなり\n法隆寺", author: "— 正岡子規", theme: "秋・音", color: "#e8d9a0" },
+  { name: "立石寺 / 山形県", lng: 140.4369, lat: 38.3117, haiku: "閑さや\n岩にしみ入る\n蝉の声", author: "— 松尾芭蕉", theme: "夏・静寂", color: "#e8d9a0" },
+  { name: "信濃 / 長野県", lng: 138.1812, lat: 36.6513, haiku: "やせ蛙\n負けるな一茶\nこれにあり", author: "— 小林一茶", theme: "春・生命", color: "#e8d9a0" },
+  { name: "最上川 / 山形県", lng: 140.1015, lat: 38.9144, haiku: "五月雨を\nあつめて早し\n最上川", author: "— 松尾芭蕉", theme: "夏・川", color: "#90c4e8" },
+  { name: "東京", lng: 139.6503, lat: 35.6762, haiku: "去年今年\n貫く棒の\nごときもの", author: "— 高浜虚子", theme: "新年・時", color: "#e8a0a0" },
+  { name: "萩 / 山口県", lng: 131.3993, lat: 34.4081, haiku: "分け入っても\n分け入っても\n青い山", author: "— 種田山頭火", theme: "旅・山", color: "#e8d9a0" },
+  { name: "平泉 / 岩手県", lng: 141.1139, lat: 38.9871, haiku: "夏草や\n兵どもが\n夢の跡", author: "— 松尾芭蕉", theme: "夏・無常", color: "#e8d9a0" },
+  { name: "宮島 / 広島県", lng: 132.3195, lat: 34.2952, haiku: "大鳥居\n海に浮かびて\n秋の空", author: "— 作者不詳", theme: "秋・光", color: "#e8a0a0" },
+
+  // --- 追加40カ所 ---
+  // 北海道・東北
+  { name: "函館 / 北海道", lng: 140.7290, lat: 41.7688, haiku: "春暁や\n函館山の\n霞かな", author: "— 高浜虚子", theme: "春・山", color: "#e8d9a0" },
+  { name: "釧路湿原 / 北海道", lng: 144.3747, lat: 43.0500, haiku: "丹頂鶴\n霧の湿原\n舞い上がる", author: "— 作者不詳", theme: "冬・自然", color: "#e8d9a0" },
+  { name: "小樽 / 北海道", lng: 140.9947, lat: 43.1907, haiku: "運河沿い\n雪積む倉庫\n灯りかな", author: "— 作者不詳", theme: "冬・港", color: "#90c4e8" },
+  { name: "十和田湖 / 青森県", lng: 140.8833, lat: 40.4667, haiku: "湖面青く\n奥入瀬の水\n流れけり", author: "— 作者不詳", theme: "夏・湖", color: "#90c4e8" },
+  { name: "角館 / 秋田県", lng: 140.5638, lat: 39.5920, haiku: "武家屋敷\n枝垂れ桜の\n重さかな", author: "— 作者不詳", theme: "春・花", color: "#e8d9a0" },
+  { name: "松尾芭蕉記念館 / 伊賀 / 三重県", lng: 136.1297, lat: 34.7694, haiku: "旅に病んで\n夢は枯野を\nかけめぐる", author: "— 松尾芭蕉", theme: "冬・旅", color: "#e8d9a0" },
+  { name: "仙台 / 宮城県", lng: 140.8694, lat: 38.2688, haiku: "七夕や\n空に届かぬ\n願いかな", author: "— 作者不詳", theme: "夏・祭", color: "#e8a0a0" },
+
+  // 関東
+  { name: "江ノ島 / 神奈川県", lng: 139.4797, lat: 35.2998, haiku: "波の音\n江の島かすむ\n春の海", author: "— 作者不詳", theme: "春・海", color: "#90c4e8" },
+  { name: "日光 / 栃木県", lng: 139.5983, lat: 36.7503, haiku: "あらたふと\n青葉若葉の\n日の光", author: "— 松尾芭蕉", theme: "夏・光", color: "#e8d9a0" },
+  { name: "上野 / 東京都", lng: 139.7744, lat: 35.7146, haiku: "花の雲\n鐘は上野か\n浅草か", author: "— 松尾芭蕉", theme: "春・花", color: "#e8a0a0" },
+  { name: "両国 / 東京都", lng: 139.7939, lat: 35.6966, haiku: "夕涼み\n隅田の風や\n夏衣", author: "— 作者不詳", theme: "夏・川", color: "#90c4e8" },
+  { name: "鎌倉 / 神奈川県", lng: 139.5468, lat: 35.3192, haiku: "大仏の\n膝に落ちたる\n木の葉かな", author: "— 作者不詳", theme: "秋・仏", color: "#e8d9a0" },
+  { name: "富士山 / 静岡県", lng: 138.7278, lat: 35.3606, haiku: "富士の風や\n扇にのせて\n江戸土産", author: "— 松尾芭蕉", theme: "夏・山", color: "#e8d9a0" },
+  { name: "箱根 / 神奈川県", lng: 139.0224, lat: 35.2328, haiku: "霧の中\n芦ノ湖静か\n秋深し", author: "— 作者不詳", theme: "秋・湖", color: "#90c4e8" },
+
+  // 中部・北陸
+  { name: "金沢 / 石川県", lng: 136.6256, lat: 36.5613, haiku: "兼六園\n雪吊りの松\n冬構え", author: "— 作者不詳", theme: "冬・庭", color: "#e8d9a0" },
+  { name: "永平寺 / 福井県", lng: 136.4980, lat: 36.0913, haiku: "杉古木\n苔むす参道\n梅雨しずく", author: "— 作者不詳", theme: "夏・寺", color: "#e8d9a0" },
+  { name: "白川郷 / 岐阜県", lng: 136.9021, lat: 36.2572, haiku: "合掌造り\n雪に埋もれて\n煙立つ", author: "— 作者不詳", theme: "冬・里", color: "#e8a0a0" },
+  { name: "諏訪湖 / 長野県", lng: 138.0746, lat: 36.0362, haiku: "諏訪の海\n御神渡りや\n冬深し", author: "— 作者不詳", theme: "冬・湖", color: "#90c4e8" },
+  { name: "伊勢神宮 / 三重県", lng: 136.7057, lat: 34.4553, haiku: "何事の\nおはしますかは\n知らねども", author: "— 松尾芭蕉", theme: "秋・神", color: "#e8d9a0" },
+  { name: "浜名湖 / 静岡県", lng: 137.6167, lat: 34.7167, haiku: "浜名湖や\n春風渡る\n鰻舟", author: "— 作者不詳", theme: "春・湖", color: "#90c4e8" },
+
+  // 近畿
+  { name: "嵐山 / 京都府", lng: 135.6720, lat: 35.0095, haiku: "嵐山\n紅葉の錦\n川に散る", author: "— 作者不詳", theme: "秋・紅葉", color: "#e8d9a0" },
+  { name: "祇園 / 京都府", lng: 135.7755, lat: 35.0035, haiku: "祇園会や\n灯りの海に\n鉾浮かぶ", author: "— 作者不詳", theme: "夏・祭", color: "#e8a0a0" },
+  { name: "奈良 / 奈良県", lng: 135.8328, lat: 34.6851, haiku: "春日野の\n若草山に\n鹿遊ぶ", author: "— 作者不詳", theme: "春・鹿", color: "#e8d9a0" },
+  { name: "大阪 / 大阪府", lng: 135.5023, lat: 34.6937, haiku: "大阪や\n食い倒れの街\n春の宵", author: "— 作者不詳", theme: "春・都", color: "#e8a0a0" },
+  { name: "姫路城 / 兵庫県", lng: 134.6939, lat: 34.8394, haiku: "白鷺城\n桜に映えて\n春霞", author: "— 作者不詳", theme: "春・城", color: "#e8d9a0" },
+  { name: "天橋立 / 京都府", lng: 135.1797, lat: 35.5497, haiku: "股のぞき\n逆さに見れば\n海の橋", author: "— 作者不詳", theme: "夏・景", color: "#90c4e8" },
+  { name: "琵琶湖 / 滋賀県", lng: 136.1667, lat: 35.3000, haiku: "湖の\n水鳥しずか\n春の朝", author: "— 松尾芭蕉", theme: "春・湖", color: "#90c4e8" },
+
+  // 中国・四国
+  { name: "出雲大社 / 島根県", lng: 132.6847, lat: 35.4017, haiku: "神在月\n縁結びの神\n霧の中", author: "— 作者不詳", theme: "秋・神", color: "#e8d9a0" },
+  { name: "鳥取砂丘 / 鳥取県", lng: 134.2333, lat: 35.5333, haiku: "砂丘果て\n風紋のみや\n冬曇り", author: "— 作者不詳", theme: "冬・砂", color: "#e8d9a0" },
+  { name: "道後温泉 / 愛媛県", lng: 132.8872, lat: 33.8518, haiku: "湯の町や\n夕暮れ迫る\n道後の鐘", author: "— 正岡子規", theme: "秋・温泉", color: "#e8a0a0" },
+  { name: "高知 / 高知県", lng: 133.5311, lat: 33.5597, haiku: "土佐の海\n鰹一本\n夏の風", author: "— 作者不詳", theme: "夏・海", color: "#90c4e8" },
+  { name: "祖谷 / 徳島県", lng: 133.8667, lat: 33.8500, haiku: "かずら橋\n谷風渡る\n秋の声", author: "— 作者不詳", theme: "秋・谷", color: "#e8d9a0" },
+  { name: "瀬戸内海 / 岡山県", lng: 133.9350, lat: 34.6167, haiku: "島々や\n霞に浮かぶ\n内海かな", author: "— 作者不詳", theme: "春・海", color: "#90c4e8" },
+
+  // 九州・沖縄
+  { name: "阿蘇山 / 熊本県", lng: 131.0894, lat: 32.8843, haiku: "阿蘇の火\n夜空を染めて\n夏の果て", author: "— 作者不詳", theme: "夏・火山", color: "#e8d9a0" },
+  { name: "長崎 / 長崎県", lng: 129.8777, lat: 32.7503, haiku: "長崎の\n灯籠流しや\n秋の海", author: "— 作者不詳", theme: "秋・海", color: "#90c4e8" },
+  { name: "屋久島 / 鹿児島県", lng: 130.5258, lat: 30.3467, haiku: "縄文杉\n千年の雨に\n濡れにけり", author: "— 作者不詳", theme: "夏・森", color: "#e8d9a0" },
+  { name: "桜島 / 鹿児島県", lng: 130.6572, lat: 31.5819, haiku: "桜島\n噴煙高く\n春霞", author: "— 作者不詳", theme: "春・火山", color: "#e8d9a0" },
+  { name: "別府温泉 / 大分県", lng: 131.4908, lat: 33.2841, haiku: "地獄湯や\n湯気に霞む\n冬の朝", author: "— 作者不詳", theme: "冬・温泉", color: "#e8a0a0" },
+  { name: "那覇 / 沖縄県", lng: 127.6791, lat: 26.2124, haiku: "珊瑚礁\n南の海や\n夏果てず", author: "— 作者不詳", theme: "夏・海", color: "#90c4e8" },
+  { name: "竹富島 / 沖縄県", lng: 124.0639, lat: 24.3244, haiku: "珊瑚の道\n三線の音\n夕なぎ", author: "— 作者不詳", theme: "夏・島", color: "#90c4e8" },
+];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {
+      'mapbox-style': {
+        type: 'raster',
+        tiles: [
+          'https://api.mapbox.com/styles/v1/aki-aogaku/cmp9qud90000k01ri7oy5bkx2/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWtpLWFvZ2FrdSIsImEiOiJjbXA5cW0zaHcwbGZkMnBvZ2RleTM5b2sxIn0.7Gj-P35EuhV7W7iMhN6Plw'
+        ],
+        tileSize: 512,
+      }
+    },
+    layers: [
+      {
+        id: 'mapbox-style-layer',
+        type: 'raster',
+        source: 'mapbox-style',
+        minzoom: 0,
+        maxzoom: 22,
+      }
+    ]
+  },
+  center: [136.5, 37.5],
+  zoom: 5.5,
+});
+
+let draftLocation = null;
+let draftMarker = null;
+let isPickingLocation = false;
+let currentHaiku = null;
+
+map.on('load', () => {
+  haikuData.forEach(addHaikuMarker);
+  if (!VERIFY_ONLY) {
+    loadLocalPins().forEach(h => {
+      haikuData.push(h);
+      addHaikuMarker(h);
+    });
+  }
+  setupComposeForm();
+});
+
+map.on('click', e => {
+  if (!isPickingLocation) return;
+  setDraftLocation(e.lngLat.lng, e.lngLat.lat);
+  stopPickingLocation();
+});
+
+function markerSvg(color) {
+  const pinColor = PIN_COLORS.includes(color) ? color : '#e8d9a0';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <circle cx="15" cy="15" r="12" fill="${pinColor}" opacity="0.15"/>
+    <circle cx="15" cy="15" r="7" fill="${pinColor}" opacity="0.92"/>
+    <circle cx="15" cy="15" r="7" fill="none" stroke="white" stroke-width="1" opacity="0.3"/>
+  </svg>`;
+}
+
+function addHaikuMarker(h) {
+  const el = document.createElement('div');
+  el.className = 'haiku-marker';
+  el.innerHTML = markerSvg(h.color);
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    showCard(h);
+  });
+
+  return new mapboxgl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([h.lng, h.lat])
+    .addTo(map);
+}
+
+function showCard(h) {
+  currentHaiku = h;
+  document.getElementById('card-location').textContent = h.name;
+  renderHaikuText(document.getElementById('card-haiku'), h.haiku);
+  document.getElementById('card-author').textContent = h.author;
+  document.getElementById('card-theme').textContent = h.theme;
+  updateOkashiButton(h);
+  document.getElementById('card').classList.add('visible');
+  document.getElementById('hint').classList.add('hidden');
+}
+
+function closeCard() {
+  document.getElementById('card').classList.remove('visible');
+}
+
+function renderHaikuText(target, text) {
+  target.replaceChildren();
+  String(text).split('\n').forEach((line, index, lines) => {
+    target.append(document.createTextNode(line));
+    if (index < lines.length - 1) target.append(document.createElement('br'));
+  });
+}
+
+function setupComposeForm() {
+  const form = document.getElementById('compose');
+  const toggle = document.getElementById('compose-toggle');
+  const close = document.querySelector('.compose-close');
+  const pickButton = document.getElementById('pick-location');
+  const currentButton = document.getElementById('current-location');
+  const searchButton = document.getElementById('search-location');
+  const searchInput = document.getElementById('place-search');
+  const okashiButton = document.getElementById('okashi-button');
+  const lineInputs = [
+    document.getElementById('compose-line-1'),
+    document.getElementById('compose-line-2'),
+    document.getElementById('compose-line-3'),
+  ];
+
+  toggle.addEventListener('click', () => {
+    form.classList.toggle('visible');
+    toggle.classList.toggle('active', form.classList.contains('visible'));
+    toggle.setAttribute('aria-expanded', String(form.classList.contains('visible')));
+  });
+
+  close.addEventListener('click', () => {
+    form.classList.remove('visible');
+    toggle.classList.remove('active');
+    toggle.setAttribute('aria-expanded', 'false');
+    stopPickingLocation();
+  });
+
+  pickButton.addEventListener('click', () => {
+    isPickingLocation ? stopPickingLocation() : startPickingLocation();
+  });
+
+  currentButton.addEventListener('click', useCurrentLocation);
+  searchButton.addEventListener('click', searchPlace);
+  searchInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    searchPlace();
+  });
+  okashiButton.addEventListener('click', toggleOkashi);
+
+  document.querySelectorAll('input[name="compose-category"]').forEach(input => {
+    input.addEventListener('change', updateDraftMarkerColor);
+  });
+
+  lineInputs.forEach(input => input.addEventListener('input', updateSyllableMeter));
+  updateSyllableMeter();
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    submitComposeForm(form);
+  });
+}
+
+function startPickingLocation() {
+  isPickingLocation = true;
+  document.body.classList.add('picking-location');
+  document.getElementById('pick-location').classList.add('active');
+  setComposeMessage('地図をクリックして場所を置いてください。');
+  closeCard();
+}
+
+function stopPickingLocation() {
+  isPickingLocation = false;
+  document.body.classList.remove('picking-location');
+  document.getElementById('pick-location').classList.remove('active');
+}
+
+function setDraftLocation(lng, lat) {
+  draftLocation = { lng, lat };
+  document.getElementById('compose-coords').textContent =
+    `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  setComposeMessage('この場所にピンを立てられます。');
+
+  if (draftMarker) draftMarker.remove();
+
+  const el = document.createElement('div');
+  el.className = 'haiku-marker draft-marker';
+  el.innerHTML = markerSvg(getSelectedColor());
+  draftMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([lng, lat])
+    .addTo(map);
+}
+
+function useCurrentLocation() {
+  if (!navigator.geolocation) {
+    setComposeMessage('このブラウザでは現在地を取得できません。', true);
+    return;
+  }
+
+  setLocationButtonBusy('current-location', true);
+  setComposeMessage('現在地を取得しています。');
+  closeCard();
+
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      const { longitude, latitude } = position.coords;
+      setDraftLocation(longitude, latitude);
+      stopPickingLocation();
+      map.flyTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), 13), essential: true });
+      fillNameFromCoordinates(longitude, latitude, '現在地');
+      setComposeMessage('現在地をセットしました。');
+      setLocationButtonBusy('current-location', false);
+    },
+    error => {
+      const message = error.code === error.PERMISSION_DENIED
+        ? '位置情報の許可が必要です。'
+        : '現在地を取得できませんでした。';
+      setComposeMessage(message, true);
+      setLocationButtonBusy('current-location', false);
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+  );
+}
+
+async function searchPlace() {
+  const input = document.getElementById('place-search');
+  const query = input.value.trim();
+  if (!query) {
+    setComposeMessage('検索したい場所を入力してください。', true);
+    input.focus();
+    return;
+  }
+
+  setLocationButtonBusy('search-location', true);
+  setComposeMessage('場所を探しています。');
+  closeCard();
+
+  try {
+    const center = map.getCenter();
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?language=ja&limit=1&proximity=${center.lng},${center.lat}&access_token=${mapboxgl.accessToken}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('search failed');
+
+    const data = await response.json();
+    const feature = data.features?.[0];
+    if (!feature?.center) {
+      setComposeMessage('場所が見つかりませんでした。', true);
+      return;
+    }
+
+    const [lng, lat] = feature.center;
+    const name = formatPlaceName(feature);
+    document.getElementById('compose-name').value = name;
+    setDraftLocation(lng, lat);
+    stopPickingLocation();
+    map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 11), essential: true });
+    setComposeMessage(`${name} をセットしました。`);
+  } catch {
+    setComposeMessage('場所検索に失敗しました。時間をおいて再度お試しください。', true);
+  } finally {
+    setLocationButtonBusy('search-location', false);
+  }
+}
+
+async function fillNameFromCoordinates(lng, lat, fallback) {
+  const nameInput = document.getElementById('compose-name');
+  if (nameInput.value.trim()) return;
+  nameInput.value = fallback;
+
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?language=ja&limit=1&access_token=${mapboxgl.accessToken}`;
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const data = await response.json();
+    const feature = data.features?.[0];
+    if (feature) nameInput.value = formatPlaceName(feature);
+  } catch {
+    nameInput.value = fallback;
+  }
+}
+
+function formatPlaceName(feature) {
+  return feature.place_name_ja || feature.place_name || feature.text_ja || feature.text || '検索地点';
+}
+
+function setLocationButtonBusy(id, busy) {
+  const button = document.getElementById(id);
+  button.disabled = busy;
+  button.style.opacity = busy ? '0.62' : '';
+}
+
+function updateDraftMarkerColor() {
+  if (!draftMarker) return;
+  draftMarker.getElement().innerHTML = markerSvg(getSelectedColor());
+}
+
+function submitComposeForm(form) {
+  if (!form.reportValidity()) return;
+
+  if (!draftLocation) {
+    setComposeMessage('先に地図で場所を選んでください。', true);
+    return;
+  }
+
+  const lines = [
+    document.getElementById('compose-line-1').value.trim(),
+    document.getElementById('compose-line-2').value.trim(),
+    document.getElementById('compose-line-3').value.trim(),
+  ];
+  const authorName = document.getElementById('compose-author').value.trim();
+  const selectedCategory = getSelectedCategory();
+  const h = {
+    id: createHaikuId(),
+    name: document.getElementById('compose-name').value.trim(),
+    lng: draftLocation.lng,
+    lat: draftLocation.lat,
+    haiku: lines.join('\n'),
+    author: authorName ? `— ${authorName.replace(/^[-—]\s*/, '')}` : '— 無名',
+    theme: document.getElementById('compose-theme').value.trim(),
+    category: selectedCategory,
+    color: getSelectedColor(),
+    createdAt: new Date().toISOString(),
+    userId: 'demo-local',
+  };
+
+  haikuData.push(h);
+  addHaikuMarker(h);
+  if (!VERIFY_ONLY) saveLocalPin(h);
+  if (draftMarker) draftMarker.remove();
+  draftMarker = null;
+  draftLocation = null;
+
+  form.reset();
+  document.getElementById('compose-coords').textContent = '座標未選択';
+  updateSyllableMeter();
+  stopPickingLocation();
+  document.getElementById('compose').classList.remove('visible');
+  document.getElementById('compose-toggle').classList.remove('active');
+  document.getElementById('compose-toggle').setAttribute('aria-expanded', 'false');
+
+  map.flyTo({ center: [h.lng, h.lat], zoom: Math.max(map.getZoom(), 8), essential: true });
+  showCard(h);
+}
+
+function getSelectedColor() {
+  return CATEGORY_OPTIONS[getSelectedCategory()]?.color || '#e8d9a0';
+}
+
+function getSelectedCategory() {
+  const input = document.querySelector('input[name="compose-category"]:checked');
+  return CATEGORY_OPTIONS[input?.value] ? input.value : 'nature';
+}
+
+function updateSyllableMeter() {
+  const counts = [
+    countHaikuChars(document.getElementById('compose-line-1').value),
+    countHaikuChars(document.getElementById('compose-line-2').value),
+    countHaikuChars(document.getElementById('compose-line-3').value),
+  ];
+  const meter = document.getElementById('syllable-meter');
+  meter.textContent = `${counts[0]} / ${counts[1]} / ${counts[2]}`;
+  meter.classList.toggle('good', counts[0] === 5 && counts[1] === 7 && counts[2] === 5);
+}
+
+function countHaikuChars(text) {
+  return String(text).replace(/[\s、。,.!?！？「」『』（）()・ー-]/g, '').length;
+}
+
+function setComposeMessage(text, warn = false) {
+  const message = document.getElementById('compose-message');
+  message.textContent = text;
+  message.classList.toggle('warn', warn);
+}
+
+function toggleOkashi() {
+  if (!currentHaiku) return;
+
+  const id = getHaikuId(currentHaiku);
+  const counts = readJson(OKASHI_STORAGE_KEY, {});
+  const liked = readJson(OKASHI_LIKED_KEY, {});
+  const wasLiked = Boolean(liked[id]);
+  const nextCount = Math.max(0, Number(counts[id] || 0) + (wasLiked ? -1 : 1));
+
+  counts[id] = nextCount;
+  liked[id] = !wasLiked;
+  localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
+  localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
+  updateOkashiButton(currentHaiku);
+}
+
+function updateOkashiButton(h) {
+  const id = getHaikuId(h);
+  const counts = readJson(OKASHI_STORAGE_KEY, {});
+  const liked = readJson(OKASHI_LIKED_KEY, {});
+  const button = document.getElementById('okashi-button');
+
+  document.getElementById('okashi-count').textContent = String(Number(counts[id] || 0));
+  button.classList.toggle('liked', Boolean(liked[id]));
+  button.setAttribute('aria-pressed', String(Boolean(liked[id])));
+}
+
+function getHaikuId(h) {
+  if (h.id) return h.id;
+  return `seed:${h.name}:${h.author}:${h.haiku}`;
+}
+
+function createHaikuId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function readJson(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || 'null');
+    return value && typeof value === 'object' ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function loadLocalPins() {
+  try {
+    const pins = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (!Array.isArray(pins)) return [];
+    return pins.filter(h =>
+      h &&
+      typeof h.name === 'string' &&
+      typeof h.haiku === 'string' &&
+      Number.isFinite(h.lng) &&
+      Number.isFinite(h.lat) &&
+      PIN_COLORS.includes(h.color)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalPin(h) {
+  const pins = loadLocalPins();
+  pins.push(h);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+}
+</script>
+</body>
+</html>
