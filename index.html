@@ -12,6 +12,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    [hidden] { display: none !important; }
 
     body {
       font-family: 'Noto Serif JP', serif;
@@ -67,6 +68,524 @@
       line-height: 1.9;
     }
 
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #account-button {
+      display: none;
+      align-items: center;
+      gap: 9px;
+      min-height: 40px;
+      border: 1px solid rgba(232, 217, 160, 0.24);
+      border-radius: 999px;
+      background: rgba(10, 9, 16, 0.72);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      padding: 5px 13px 5px 6px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+
+    #account-button.visible { display: flex; }
+
+    .user-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      border-radius: 50%;
+      background: rgba(232, 217, 160, 0.12);
+      border: 1px solid rgba(232, 217, 160, 0.22);
+      font-size: 16px;
+      overflow: hidden;
+    }
+
+    .user-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #account-name {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+    }
+
+    #auth-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      pointer-events: all;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 50% 28%, rgba(144, 196, 232, 0.12), transparent 34%),
+        rgba(7, 7, 12, 0.96);
+      backdrop-filter: blur(12px);
+    }
+
+    #auth-gate.hidden { display: none; }
+
+    .auth-panel {
+      width: min(420px, 100%);
+      border: 1px solid rgba(232, 217, 160, 0.2);
+      background: rgba(12, 11, 18, 0.96);
+      padding: 32px;
+    }
+
+    .auth-brand {
+      color: #e8d9a0;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 26px;
+      letter-spacing: 0.2em;
+      margin-bottom: 8px;
+    }
+
+    .auth-copy {
+      color: #6a6458;
+      font-size: 11px;
+      letter-spacing: 0.13em;
+      line-height: 1.8;
+      margin-bottom: 22px;
+    }
+
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-bottom: 18px;
+    }
+
+    .auth-tab {
+      min-height: 38px;
+      border: 0;
+      border-bottom: 1px solid rgba(232, 217, 160, 0.14);
+      background: transparent;
+      color: #5a5448;
+      font-family: 'Noto Serif JP', serif;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+    }
+
+    .auth-tab.active {
+      color: #e8d9a0;
+      border-bottom-color: rgba(232, 217, 160, 0.58);
+    }
+
+    .auth-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .auth-field,
+    .profile-field {
+      display: grid;
+      gap: 6px;
+      color: #7a7060;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+    }
+
+    .auth-field input,
+    .profile-field input,
+    .profile-field select,
+    .profile-field textarea {
+      width: 100%;
+      border: 1px solid rgba(232, 217, 160, 0.16);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.25);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 13px;
+      padding: 10px;
+      outline: none;
+    }
+
+    .profile-field textarea {
+      min-height: 86px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    .auth-submit,
+    .profile-save {
+      min-height: 42px;
+      border: 1px solid rgba(232, 217, 160, 0.34);
+      border-radius: 2px;
+      background: rgba(232, 217, 160, 0.1);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      cursor: pointer;
+    }
+
+    #auth-message,
+    #profile-message {
+      min-height: 18px;
+      color: #e8a0a0;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      line-height: 1.7;
+    }
+
+    #profile-panel {
+      position: absolute;
+      top: 82px;
+      right: 28px;
+      z-index: 40;
+      width: min(370px, calc(100vw - 40px));
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-8px);
+      border: 1px solid rgba(232, 217, 160, 0.2);
+      background: rgba(10, 9, 16, 0.96);
+      padding: 22px;
+      backdrop-filter: blur(16px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+
+    #profile-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .profile-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .profile-title {
+      color: #e8d9a0;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+    }
+
+    .profile-close,
+    .logout-button,
+    .friend-remove {
+      border: 0;
+      background: transparent;
+      color: #6a6458;
+      font-family: 'Noto Serif JP', serif;
+      cursor: pointer;
+    }
+
+    .profile-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .profile-preview .user-icon {
+      width: 48px;
+      height: 48px;
+      flex-basis: 48px;
+      font-size: 24px;
+    }
+
+    .profile-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin: 16px 0;
+    }
+
+    .profile-stat {
+      padding: 10px 6px;
+      border: 1px solid rgba(232, 217, 160, 0.12);
+      text-align: center;
+    }
+
+    .profile-stat strong {
+      display: block;
+      color: #e8d9a0;
+      font-size: 18px;
+      font-weight: 400;
+      margin-bottom: 3px;
+    }
+
+    .profile-stat span {
+      color: #5a5448;
+      font-size: 8px;
+      letter-spacing: 0.12em;
+    }
+
+    .profile-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .friends-heading {
+      color: #7a7060;
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      margin: 22px 0 9px;
+    }
+
+    .friend-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .friend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px;
+      background: rgba(232, 217, 160, 0.04);
+    }
+
+    .friend-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .friend-name {
+      color: #d8d0be;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+
+    .friend-bio {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #524e45;
+      font-size: 9px;
+      margin-top: 3px;
+    }
+
+    .friend-empty {
+      color: #4a4538;
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .logout-button {
+      width: 100%;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(232, 217, 160, 0.1);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+    }
+
+    .icon-upload-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #profile-icon-file {
+      font-size: 10px;
+      color: #7a7060;
+    }
+
+    #profile-icon-file::file-selector-button,
+    #remove-icon-image {
+      min-height: 34px;
+      border: 1px solid rgba(232, 217, 160, 0.22);
+      border-radius: 2px;
+      background: rgba(232, 217, 160, 0.06);
+      color: #d8d0be;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+
+    #remove-icon-image {
+      white-space: nowrap;
+    }
+
+    .icon-note {
+      color: #4a4538;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      line-height: 1.6;
+    }
+
+    .delete-haiku-button {
+      min-height: 28px;
+      border: 1px solid rgba(232, 160, 160, 0.24);
+      border-radius: 999px;
+      background: rgba(232, 160, 160, 0.05);
+      color: #b87878;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      padding: 4px 11px;
+      cursor: pointer;
+    }
+
+    #ranking-toggle {
+      position: absolute;
+      top: 154px;
+      left: 136px;
+      pointer-events: all;
+      min-height: 38px;
+      border: 1px solid rgba(144, 196, 232, 0.28);
+      border-radius: 2px;
+      background: rgba(10, 9, 16, 0.78);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 0 14px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+
+    #ranking-toggle.active {
+      background: rgba(10, 9, 16, 0.95);
+      border-color: rgba(144, 196, 232, 0.5);
+    }
+
+    #ranking-panel {
+      position: absolute;
+      top: 204px;
+      left: 28px;
+      z-index: 35;
+      width: min(390px, calc(100vw - 56px));
+      max-height: calc(100vh - 244px);
+      overflow-y: auto;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      border: 1px solid rgba(144, 196, 232, 0.18);
+      background: rgba(10, 9, 16, 0.94);
+      padding: 20px;
+      backdrop-filter: blur(16px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+
+    #ranking-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .ranking-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .ranking-title {
+      color: #e8d9a0;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 17px;
+      letter-spacing: 0.18em;
+    }
+
+    .ranking-close {
+      border: 0;
+      background: transparent;
+      color: #6a6458;
+      cursor: pointer;
+    }
+
+    .ranking-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-bottom: 14px;
+    }
+
+    .ranking-tab {
+      min-height: 36px;
+      border: 0;
+      border-bottom: 1px solid rgba(144, 196, 232, 0.14);
+      background: transparent;
+      color: #5a6070;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      cursor: pointer;
+    }
+
+    .ranking-tab.active {
+      color: #90c4e8;
+      border-bottom-color: rgba(144, 196, 232, 0.58);
+    }
+
+    .ranking-note {
+      color: #4a535d;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+
+    .ranking-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .ranking-item {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      width: 100%;
+      border: 1px solid rgba(232, 217, 160, 0.1);
+      background: rgba(232, 217, 160, 0.03);
+      color: inherit;
+      text-align: left;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .ranking-position {
+      color: #90c4e8;
+      font-size: 15px;
+      text-align: center;
+    }
+
+    .ranking-haiku {
+      display: block;
+      color: #d8d0be;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .ranking-author {
+      display: block;
+      color: #565147;
+      font-size: 8px;
+      margin-top: 3px;
+    }
+
+    .ranking-score {
+      color: #e8d9a0;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .ranking-empty {
+      color: #4a4538;
+      font-size: 10px;
+      line-height: 1.8;
+      padding: 16px 4px;
+    }
+
     #legend {
       position: absolute;
       top: 90px;
@@ -120,6 +639,10 @@
       opacity: 0;
       transition: opacity 0.45s ease, transform 0.45s ease;
       pointer-events: none;
+      height: min(440px, calc(100vh - 80px));
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      scrollbar-color: rgba(232, 217, 160, 0.28) transparent;
     }
 
     #card.visible {
@@ -151,7 +674,40 @@
       font-size: 11px;
       color: #5a5448;
       letter-spacing: 0.32em;
+    }
+
+    .card-author-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
       margin-bottom: 18px;
+    }
+
+    .card-author-row .user-icon {
+      width: 28px;
+      height: 28px;
+      flex-basis: 28px;
+      font-size: 14px;
+    }
+
+    #friend-button {
+      margin-left: auto;
+      min-height: 28px;
+      border: 1px solid rgba(144, 196, 232, 0.28);
+      border-radius: 999px;
+      background: rgba(144, 196, 232, 0.06);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.13em;
+      padding: 4px 11px;
+      cursor: pointer;
+    }
+
+    #friend-button.added {
+      color: #7a7060;
+      border-color: rgba(232, 217, 160, 0.18);
+      background: rgba(232, 217, 160, 0.04);
     }
 
     .card-theme {
@@ -191,6 +747,161 @@
       border-color: rgba(232, 217, 160, 0.48);
       background: rgba(232, 217, 160, 0.12);
     }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .reply-summary {
+      color: #90c4e8;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 4px 2px;
+      white-space: nowrap;
+    }
+
+    #reply-area {
+      display: block;
+      margin-top: 18px;
+      padding-top: 22px;
+      border-top: 1px solid rgba(232, 217, 160, 0.12);
+    }
+
+    .reply-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: #7a7060;
+      margin-bottom: 12px;
+    }
+
+    .reply-order {
+      color: #4a6070;
+      letter-spacing: 0.14em;
+    }
+
+    .reply-list {
+      display: grid;
+      gap: 11px;
+      margin-bottom: 14px;
+    }
+
+    .reply-item {
+      padding: 11px 13px;
+      border-left: 1px solid rgba(144, 196, 232, 0.42);
+      background: rgba(144, 196, 232, 0.04);
+    }
+
+    .reply-haiku {
+      color: #d8d7c9;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 14px;
+      line-height: 1.8;
+      letter-spacing: 0.1em;
+    }
+
+    .reply-author {
+      color: #5a5448;
+      font-size: 9px;
+      letter-spacing: 0.22em;
+    }
+
+    .reply-item-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .reply-okashi-button {
+      min-height: 25px;
+      border: 1px solid rgba(232, 217, 160, 0.2);
+      border-radius: 999px;
+      background: rgba(232, 217, 160, 0.04);
+      color: #6a6456;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      padding: 3px 10px;
+      cursor: pointer;
+    }
+
+    .reply-okashi-button:hover,
+    .reply-okashi-button.liked {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.44);
+      background: rgba(232, 217, 160, 0.1);
+    }
+
+    .reply-empty {
+      color: #4a4538;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      margin-bottom: 14px;
+    }
+
+    .reply-form {
+      display: grid;
+      gap: 8px;
+    }
+
+    .reply-lines {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .reply-form input {
+      width: 100%;
+      min-width: 0;
+      min-height: 34px;
+      border: 1px solid rgba(144, 196, 232, 0.2);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.22);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 12px;
+      padding: 8px 9px;
+      outline: none;
+    }
+
+    .reply-form input:focus {
+      border-color: rgba(144, 196, 232, 0.52);
+    }
+
+    .reply-form input::placeholder { color: #4a4538; }
+
+    .reply-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .reply-submit {
+      border: 1px solid rgba(144, 196, 232, 0.34);
+      border-radius: 2px;
+      background: rgba(144, 196, 232, 0.09);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 0 14px;
+      cursor: pointer;
+    }
+
+    #reply-message {
+      min-height: 16px;
+      color: #7a7060;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+    }
+
+    #reply-message.warn { color: #e8a0a0; }
 
     .card-close {
       position: absolute;
@@ -499,6 +1210,15 @@
 
       .logo-main { font-size: 24px; }
       .header-desc { display: none; }
+      .header-right { gap: 8px; }
+      #account-name { display: none; }
+      #account-button { padding-right: 6px; }
+
+      #profile-panel {
+        top: 76px;
+        right: 20px;
+        max-height: calc(100vh - 96px);
+      }
 
       #legend {
         top: 86px;
@@ -509,6 +1229,18 @@
       #compose-toggle {
         top: 88px;
         left: 20px;
+      }
+
+      #ranking-toggle {
+        top: 88px;
+        left: 126px;
+      }
+
+      #ranking-panel {
+        top: 138px;
+        left: 20px;
+        width: calc(100vw - 40px);
+        max-height: calc(100vh - 190px);
       }
 
       #compose {
@@ -528,7 +1260,14 @@
       #card {
         bottom: 26px;
         padding: 26px 24px 22px;
+        height: min(440px, calc(100vh - 52px));
+        max-height: calc(100vh - 52px);
       }
+
+      .reply-lines,
+      .reply-footer { grid-template-columns: 1fr; }
+
+      .reply-submit { min-height: 34px; }
     }
   </style>
 </head>
@@ -536,17 +1275,92 @@
 
 <div id="map"></div>
 
+<div id="auth-gate">
+  <div class="auth-panel">
+    <div class="auth-brand">俳句GO</div>
+    <div class="auth-copy">ことばと場所を、あなたの名前で結ぶ。<br>アカウントを作成するか、ログインしてください。</div>
+    <div class="auth-tabs" role="tablist" aria-label="アカウント">
+      <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true">ログイン</button>
+      <button class="auth-tab" id="signup-tab" type="button" role="tab" aria-selected="false">新規登録</button>
+    </div>
+    <form class="auth-form" id="auth-form">
+      <label class="auth-field" id="signup-name-field" hidden>
+        アカウントの名前
+        <input id="auth-display-name" type="text" autocomplete="name" maxlength="24">
+      </label>
+      <label class="auth-field">
+        ユーザー名
+        <input id="auth-username" type="text" autocomplete="username" maxlength="24" required>
+      </label>
+      <label class="auth-field">
+        パスワード
+        <input id="auth-password" type="password" autocomplete="current-password" minlength="4" required>
+      </label>
+      <div id="auth-message" aria-live="polite"></div>
+      <button class="auth-submit" id="auth-submit" type="submit">ログイン</button>
+    </form>
+  </div>
+</div>
+
 <div id="ui">
   <div id="header">
     <div>
       <div class="logo-main">俳句GO</div>
       <div class="logo-sub">HAIKU × PLACE</div>
     </div>
-    <div class="header-desc">
-      場所が俳句になる。<br>
-      ピンをクリックして、その土地の言葉を読む。
+    <div class="header-right">
+      <div class="header-desc">
+        場所が俳句になる。<br>
+        ピンをクリックして、その土地の言葉を読む。
+      </div>
+      <button id="account-button" type="button" aria-expanded="false" aria-controls="profile-panel">
+        <span class="user-icon" id="account-icon">🌿</span>
+        <span id="account-name"></span>
+      </button>
     </div>
   </div>
+
+  <aside id="profile-panel" aria-label="プロフィール">
+    <div class="profile-head">
+      <div class="profile-title">わたしの帳面</div>
+      <button class="profile-close" type="button" aria-label="プロフィールを閉じる">✕</button>
+    </div>
+    <div class="profile-preview">
+      <span class="user-icon" id="profile-preview-icon">🌿</span>
+      <div>
+        <div class="friend-name" id="profile-preview-name"></div>
+        <div class="friend-bio" id="profile-username"></div>
+      </div>
+    </div>
+    <div class="profile-stats">
+      <div class="profile-stat"><strong id="profile-okashi">0</strong><span>獲得をかし</span></div>
+      <div class="profile-stat"><strong id="profile-haiku-count">0</strong><span>投稿した句</span></div>
+      <div class="profile-stat"><strong id="profile-friend-count">0</strong><span>俳友</span></div>
+    </div>
+    <form class="profile-form" id="profile-form">
+      <label class="profile-field">
+        アカウントの名前
+        <input id="profile-name" type="text" maxlength="24" required>
+      </label>
+      <label class="profile-field">
+        アイコン画像
+        <div class="icon-upload-row">
+          <input id="profile-icon-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+          <button id="remove-icon-image" type="button">画像を外す</button>
+        </div>
+        <span class="icon-note">PNG・JPEG・WebP・GIF、2MBまで</span>
+      </label>
+      <label class="profile-field">
+        bio
+        <textarea id="profile-bio" maxlength="160" placeholder="好きな季語や、詠みたい風景など"></textarea>
+      </label>
+      <div id="profile-message" aria-live="polite"></div>
+      <button class="profile-save" type="submit">プロフィールを保存</button>
+    </form>
+    <div class="friends-heading">俳友</div>
+    <div class="friend-list" id="friend-list"></div>
+    <button class="logout-button" id="logout-button" type="button">ログアウト</button>
+  </aside>
 
   <div id="legend">
     <div class="legend-item">
@@ -564,6 +1378,20 @@
   </div>
 
   <button id="compose-toggle" type="button" aria-expanded="false" aria-controls="compose">＋ 詠む</button>
+  <button id="ranking-toggle" type="button" aria-expanded="false" aria-controls="ranking-panel">ランキング</button>
+
+  <section id="ranking-panel" aria-label="をかしランキング">
+    <div class="ranking-head">
+      <div class="ranking-title">をかしランキング</div>
+      <button class="ranking-close" type="button" aria-label="ランキングを閉じる">✕</button>
+    </div>
+    <div class="ranking-tabs" role="tablist" aria-label="ランキング期間">
+      <button class="ranking-tab active" id="weekly-ranking-tab" type="button" role="tab" aria-selected="true">週間</button>
+      <button class="ranking-tab" id="monthly-ranking-tab" type="button" role="tab" aria-selected="false">月間</button>
+    </div>
+    <div class="ranking-note" id="ranking-note">直近7日間に得た「をかし」</div>
+    <div class="ranking-list" id="ranking-list"></div>
+  </section>
 
   <form id="compose" aria-label="俳句投稿フォーム">
     <div class="compose-head">
@@ -656,14 +1484,42 @@
     <button class="card-close" onclick="closeCard()">✕</button>
     <div class="card-location" id="card-location"></div>
     <div class="card-haiku" id="card-haiku"></div>
-    <div class="card-author" id="card-author"></div>
+    <div class="card-author-row">
+      <span class="user-icon" id="card-author-icon">✒️</span>
+      <div class="card-author" id="card-author"></div>
+      <button id="friend-button" type="button">俳友に追加</button>
+    </div>
     <div class="card-meta-row">
       <div class="card-theme" id="card-theme"></div>
-      <button class="okashi-button" id="okashi-button" type="button" aria-pressed="false">
-        をかし <span id="okashi-count">0</span>
-      </button>
+      <div class="card-actions">
+        <div class="reply-summary" id="reply-summary">↓ 返句 <span id="reply-count">0</span></div>
+        <button class="delete-haiku-button" id="delete-haiku-button" type="button">削除</button>
+        <button class="okashi-button" id="okashi-button" type="button" aria-pressed="false">
+          をかし <span id="okashi-count">0</span>
+        </button>
+      </div>
     </div>
+    <section id="reply-area" aria-label="返句">
+      <div class="reply-heading">
+        <span>この句への返句</span>
+        <span class="reply-order">をかし順</span>
+      </div>
+      <div class="reply-list" id="reply-list"></div>
+      <form class="reply-form" id="reply-form">
+        <div class="reply-lines">
+          <input id="reply-line-1" type="text" placeholder="上五" aria-label="返句の上五" required>
+          <input id="reply-line-2" type="text" placeholder="中七" aria-label="返句の中七" required>
+          <input id="reply-line-3" type="text" placeholder="下五" aria-label="返句の下五" required>
+        </div>
+        <div class="reply-footer">
+          <input id="reply-author" type="text" placeholder="作者（無名）" aria-label="返句の作者">
+          <button class="reply-submit" type="submit">返句を置く</button>
+        </div>
+        <div id="reply-message" aria-live="polite"></div>
+      </form>
+    </section>
   </div>
+</div>
 </div>
 
 <script>
@@ -672,6 +1528,13 @@ mapboxgl.accessToken = 'pk.eyJ1IjoiYWtpLWFvZ2FrdSIsImEiOiJjbXA5cW0zaHcwbGZkMnBvZ
 const STORAGE_KEY = 'haiku_go_local_pins_v1';
 const OKASHI_STORAGE_KEY = 'haiku_go_okashi_counts_v1';
 const OKASHI_LIKED_KEY = 'haiku_go_okashi_liked_v1';
+const OKASHI_EVENTS_KEY = 'haiku_go_okashi_events_v1';
+const REPLY_STORAGE_KEY = 'haiku_go_replies_v1';
+const REPLY_OKASHI_STORAGE_KEY = 'haiku_go_reply_okashi_counts_v1';
+const REPLY_OKASHI_LIKED_KEY = 'haiku_go_reply_okashi_liked_v1';
+let replyStore = readJson(REPLY_STORAGE_KEY, {});
+let replyOkashiCounts = readJson(REPLY_OKASHI_STORAGE_KEY, {});
+let replyOkashiLiked = readJson(REPLY_OKASHI_LIKED_KEY, {});
 const CATEGORY_OPTIONS = {
   nature: { label: '自然', color: '#e8d9a0' },
   water: { label: '水辺', color: '#90c4e8' },
@@ -681,6 +1544,19 @@ const CATEGORY_OPTIONS = {
 };
 const PIN_COLORS = [...new Set(Object.values(CATEGORY_OPTIONS).map(category => category.color))];
 const VERIFY_ONLY = new URLSearchParams(window.location.search).has('verify');
+const USERS_STORAGE_KEY = 'haiku_go_users_v1';
+const SESSION_STORAGE_KEY = 'haiku_go_session_v1';
+const FRIENDS_STORAGE_KEY = 'haiku_go_friends_v1';
+let usersStore = readJson(USERS_STORAGE_KEY, {});
+let friendsStore = readJson(FRIENDS_STORAGE_KEY, {});
+let currentUserId = VERIFY_ONLY ? null : localStorage.getItem(SESSION_STORAGE_KEY);
+let authMode = 'login';
+let okashiEvents = Array.isArray(readJson(OKASHI_EVENTS_KEY, []))
+  ? readJson(OKASHI_EVENTS_KEY, [])
+  : [];
+let pendingIconImage = null;
+let rankingPeriod = 'weekly';
+const haikuMarkers = new Map();
 
 const haikuData = [
   // --- 既存10カ所 ---
@@ -781,16 +1657,16 @@ let draftMarker = null;
 let isPickingLocation = false;
 let currentHaiku = null;
 
-map.on('load', () => {
-  haikuData.forEach(addHaikuMarker);
-  if (!VERIFY_ONLY) {
-    loadLocalPins().forEach(h => {
-      haikuData.push(h);
-      addHaikuMarker(h);
-    });
-  }
-  setupComposeForm();
-});
+haikuData.forEach(addHaikuMarker);
+if (!VERIFY_ONLY) {
+  loadLocalPins().forEach(h => {
+    haikuData.push(h);
+    addHaikuMarker(h);
+  });
+}
+setupComposeForm();
+setupAccountSystem();
+setupRankingSystem();
 
 map.on('click', e => {
   if (!isPickingLocation) return;
@@ -810,30 +1686,45 @@ function markerSvg(color) {
 function addHaikuMarker(h) {
   const el = document.createElement('div');
   el.className = 'haiku-marker';
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('aria-label', `${h.name}の俳句を読む`);
   el.innerHTML = markerSvg(h.color);
   el.addEventListener('click', e => {
     e.stopPropagation();
     showCard(h);
   });
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    showCard(h);
+  });
 
-  return new mapboxgl.Marker({ element: el, anchor: 'center' })
+  const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
     .setLngLat([h.lng, h.lat])
     .addTo(map);
+  haikuMarkers.set(getHaikuId(h), marker);
+  return marker;
 }
 
 function showCard(h) {
   currentHaiku = h;
   document.getElementById('card-location').textContent = h.name;
   renderHaikuText(document.getElementById('card-haiku'), h.haiku);
-  document.getElementById('card-author').textContent = h.author;
+  updateCardAuthor(h);
   document.getElementById('card-theme').textContent = h.theme;
   updateOkashiButton(h);
-  document.getElementById('card').classList.add('visible');
+  updateReplyArea(h);
+  updateDeleteButton(h);
+  const card = document.getElementById('card');
+  card.scrollTop = 0;
+  card.classList.add('visible');
   document.getElementById('hint').classList.add('hidden');
 }
 
 function closeCard() {
   document.getElementById('card').classList.remove('visible');
+  resetReplyForm();
 }
 
 function renderHaikuText(target, text) {
@@ -853,6 +1744,7 @@ function setupComposeForm() {
   const searchButton = document.getElementById('search-location');
   const searchInput = document.getElementById('place-search');
   const okashiButton = document.getElementById('okashi-button');
+  const replyForm = document.getElementById('reply-form');
   const lineInputs = [
     document.getElementById('compose-line-1'),
     document.getElementById('compose-line-2'),
@@ -860,6 +1752,14 @@ function setupComposeForm() {
   ];
 
   toggle.addEventListener('click', () => {
+    const user = getCurrentUser();
+    if (!user) {
+      showAuthGate();
+      return;
+    }
+    document.getElementById('compose-author').value = user.displayName;
+    closeRankingPanel();
+    if (!form.classList.contains('visible')) closeCard();
     form.classList.toggle('visible');
     toggle.classList.toggle('active', form.classList.contains('visible'));
     toggle.setAttribute('aria-expanded', String(form.classList.contains('visible')));
@@ -884,6 +1784,7 @@ function setupComposeForm() {
     searchPlace();
   });
   okashiButton.addEventListener('click', toggleOkashi);
+  replyForm.addEventListener('submit', submitReply);
 
   document.querySelectorAll('input[name="compose-category"]').forEach(input => {
     input.addEventListener('change', updateDraftMarkerColor);
@@ -1032,6 +1933,11 @@ function updateDraftMarkerColor() {
 }
 
 function submitComposeForm(form) {
+  const user = getCurrentUser();
+  if (!user) {
+    showAuthGate();
+    return;
+  }
   if (!form.reportValidity()) return;
 
   if (!draftLocation) {
@@ -1044,7 +1950,6 @@ function submitComposeForm(form) {
     document.getElementById('compose-line-2').value.trim(),
     document.getElementById('compose-line-3').value.trim(),
   ];
-  const authorName = document.getElementById('compose-author').value.trim();
   const selectedCategory = getSelectedCategory();
   const h = {
     id: createHaikuId(),
@@ -1052,12 +1957,12 @@ function submitComposeForm(form) {
     lng: draftLocation.lng,
     lat: draftLocation.lat,
     haiku: lines.join('\n'),
-    author: authorName ? `— ${authorName.replace(/^[-—]\s*/, '')}` : '— 無名',
+    author: `— ${user.displayName}`,
     theme: document.getElementById('compose-theme').value.trim(),
     category: selectedCategory,
     color: getSelectedColor(),
     createdAt: new Date().toISOString(),
-    userId: 'demo-local',
+    userId: user.id,
   };
 
   haikuData.push(h);
@@ -1068,6 +1973,7 @@ function submitComposeForm(form) {
   draftLocation = null;
 
   form.reset();
+  document.getElementById('compose-author').value = user.displayName;
   document.getElementById('compose-coords').textContent = '座標未選択';
   updateSyllableMeter();
   stopPickingLocation();
@@ -1110,30 +2016,759 @@ function setComposeMessage(text, warn = false) {
 }
 
 function toggleOkashi() {
-  if (!currentHaiku) return;
+  const user = getCurrentUser();
+  if (!currentHaiku || !user) return;
 
   const id = getHaikuId(currentHaiku);
   const counts = readJson(OKASHI_STORAGE_KEY, {});
   const liked = readJson(OKASHI_LIKED_KEY, {});
-  const wasLiked = Boolean(liked[id]);
+  const likedKey = `${user.id}:${id}`;
+  const wasLiked = Boolean(liked[likedKey]);
   const nextCount = Math.max(0, Number(counts[id] || 0) + (wasLiked ? -1 : 1));
 
   counts[id] = nextCount;
-  liked[id] = !wasLiked;
-  localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
-  localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
+  liked[likedKey] = !wasLiked;
+  if (wasLiked) {
+    okashiEvents = okashiEvents.filter(event =>
+      !(event.haikuId === id && event.userId === user.id)
+    );
+  } else {
+    okashiEvents.push({
+      haikuId: id,
+      userId: user.id,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  if (!VERIFY_ONLY) {
+    localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
+    localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
+    localStorage.setItem(OKASHI_EVENTS_KEY, JSON.stringify(okashiEvents));
+  }
   updateOkashiButton(currentHaiku);
+  if (document.getElementById('ranking-panel').classList.contains('visible')) {
+    renderRanking();
+  }
 }
 
 function updateOkashiButton(h) {
+  const user = getCurrentUser();
   const id = getHaikuId(h);
   const counts = readJson(OKASHI_STORAGE_KEY, {});
   const liked = readJson(OKASHI_LIKED_KEY, {});
   const button = document.getElementById('okashi-button');
 
   document.getElementById('okashi-count').textContent = String(Number(counts[id] || 0));
-  button.classList.toggle('liked', Boolean(liked[id]));
-  button.setAttribute('aria-pressed', String(Boolean(liked[id])));
+  const likedKey = user ? `${user.id}:${id}` : id;
+  button.classList.toggle('liked', Boolean(liked[likedKey]));
+  button.setAttribute('aria-pressed', String(Boolean(liked[likedKey])));
+}
+
+function resetReplyForm() {
+  document.getElementById('reply-form').reset();
+  const user = getCurrentUser();
+  if (user) document.getElementById('reply-author').value = user.displayName;
+  setReplyMessage('');
+}
+
+function updateReplyArea(h) {
+  const id = getHaikuId(h);
+  const replies = getReplies(id);
+  const isOwnHaiku = h.userId && h.userId === getCurrentUser()?.id;
+
+  resetReplyForm();
+  document.getElementById('reply-count').textContent = String(replies.length);
+  document.getElementById('reply-summary').hidden = isOwnHaiku;
+  document.getElementById('reply-area').hidden = isOwnHaiku;
+  renderReplies(replies);
+}
+
+function renderReplies(replies) {
+  const list = document.getElementById('reply-list');
+  list.replaceChildren();
+  const orderedReplies = [...replies].sort((a, b) => {
+    const countDifference =
+      Number(replyOkashiCounts[b.id] || 0) - Number(replyOkashiCounts[a.id] || 0);
+    if (countDifference) return countDifference;
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  });
+
+  if (!orderedReplies.length) {
+    const empty = document.createElement('div');
+    empty.className = 'reply-empty';
+    empty.textContent = 'まだ返句はありません。最初の一句を。';
+    list.append(empty);
+    return;
+  }
+
+  orderedReplies.forEach(reply => {
+    const user = getCurrentUser();
+    const likedKey = user ? `${user.id}:${reply.id}` : reply.id;
+    const item = document.createElement('article');
+    item.className = 'reply-item';
+    const haiku = document.createElement('div');
+    haiku.className = 'reply-haiku';
+    renderHaikuText(haiku, reply.haiku);
+    const author = document.createElement('div');
+    author.className = 'reply-author';
+    author.textContent = reply.author;
+    const okashiButton = document.createElement('button');
+    okashiButton.className = 'reply-okashi-button';
+    okashiButton.type = 'button';
+    okashiButton.textContent = `をかし ${Number(replyOkashiCounts[reply.id] || 0)}`;
+    okashiButton.classList.toggle('liked', Boolean(replyOkashiLiked[likedKey]));
+    okashiButton.setAttribute('aria-pressed', String(Boolean(replyOkashiLiked[likedKey])));
+    okashiButton.setAttribute(
+      'aria-label',
+      `${reply.author}の返句に「をかし」 ${Number(replyOkashiCounts[reply.id] || 0)}`
+    );
+    okashiButton.addEventListener('click', () => toggleReplyOkashi(reply.id));
+    const footer = document.createElement('div');
+    footer.className = 'reply-item-footer';
+    footer.append(author, okashiButton);
+    item.append(haiku, footer);
+    list.append(item);
+  });
+}
+
+function toggleReplyOkashi(replyId) {
+  const user = getCurrentUser();
+  if (!currentHaiku || !user) return;
+  const likedKey = `${user.id}:${replyId}`;
+  const wasLiked = Boolean(replyOkashiLiked[likedKey]);
+
+  replyOkashiCounts[replyId] = Math.max(
+    0,
+    Number(replyOkashiCounts[replyId] || 0) + (wasLiked ? -1 : 1)
+  );
+  replyOkashiLiked[likedKey] = !wasLiked;
+  if (!VERIFY_ONLY) {
+    localStorage.setItem(REPLY_OKASHI_STORAGE_KEY, JSON.stringify(replyOkashiCounts));
+    localStorage.setItem(REPLY_OKASHI_LIKED_KEY, JSON.stringify(replyOkashiLiked));
+  }
+  renderReplies(getReplies(getHaikuId(currentHaiku)));
+}
+
+function submitReply(event) {
+  event.preventDefault();
+  const user = getCurrentUser();
+  if (!user) {
+    showAuthGate();
+    return;
+  }
+  if (!currentHaiku || currentHaiku.userId === user.id) return;
+
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+
+  const lines = [
+    document.getElementById('reply-line-1').value.trim(),
+    document.getElementById('reply-line-2').value.trim(),
+    document.getElementById('reply-line-3').value.trim(),
+  ];
+  if (lines.some(line => !line)) {
+    setReplyMessage('三行すべて入力してください。', true);
+    return;
+  }
+
+  const reply = {
+    id: createHaikuId(),
+    haiku: lines.join('\n'),
+    author: `— ${user.displayName}`,
+    createdAt: new Date().toISOString(),
+    userId: user.id,
+  };
+  const haikuId = getHaikuId(currentHaiku);
+  const replies = Array.isArray(replyStore[haikuId]) ? replyStore[haikuId] : [];
+  replies.push(reply);
+  replyStore[haikuId] = replies;
+  if (!VERIFY_ONLY) localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+
+  form.reset();
+  document.getElementById('reply-count').textContent = String(replies.length);
+  renderReplies(replies);
+  setReplyMessage('返句を置きました。');
+}
+
+function getReplies(haikuId) {
+  const replies = replyStore[haikuId];
+  if (!Array.isArray(replies)) return [];
+  return replies.filter(reply =>
+    reply &&
+    typeof reply.haiku === 'string' &&
+    typeof reply.author === 'string'
+  );
+}
+
+function setReplyMessage(text, warn = false) {
+  const message = document.getElementById('reply-message');
+  message.textContent = text;
+  message.classList.toggle('warn', warn);
+}
+
+function setupRankingSystem() {
+  document.getElementById('ranking-toggle').addEventListener('click', () => {
+    const panel = document.getElementById('ranking-panel');
+    const willOpen = !panel.classList.contains('visible');
+    document.getElementById('compose').classList.remove('visible');
+    document.getElementById('compose-toggle').classList.remove('active');
+    document.getElementById('compose-toggle').setAttribute('aria-expanded', 'false');
+    closeCard();
+    panel.classList.toggle('visible', willOpen);
+    document.getElementById('ranking-toggle').classList.toggle('active', willOpen);
+    document.getElementById('ranking-toggle').setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) renderRanking();
+  });
+  document.querySelector('.ranking-close').addEventListener('click', closeRankingPanel);
+  document.getElementById('weekly-ranking-tab').addEventListener('click', () => {
+    rankingPeriod = 'weekly';
+    renderRanking();
+  });
+  document.getElementById('monthly-ranking-tab').addEventListener('click', () => {
+    rankingPeriod = 'monthly';
+    renderRanking();
+  });
+  renderRanking();
+}
+
+function closeRankingPanel() {
+  document.getElementById('ranking-panel').classList.remove('visible');
+  document.getElementById('ranking-toggle').classList.remove('active');
+  document.getElementById('ranking-toggle').setAttribute('aria-expanded', 'false');
+}
+
+function renderRanking() {
+  const isWeekly = rankingPeriod === 'weekly';
+  const days = isWeekly ? 7 : 30;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const scores = new Map();
+  okashiEvents.forEach(event => {
+    const eventTime = Date.parse(event.createdAt);
+    if (!event.haikuId || !Number.isFinite(eventTime) || eventTime < cutoff) return;
+    scores.set(event.haikuId, (scores.get(event.haikuId) || 0) + 1);
+  });
+
+  const ranked = [...scores.entries()]
+    .map(([haikuId, score]) => ({
+      haiku: haikuData.find(item => getHaikuId(item) === haikuId),
+      score,
+    }))
+    .filter(entry => entry.haiku)
+    .sort((a, b) => b.score - a.score ||
+      String(a.haiku.createdAt || '').localeCompare(String(b.haiku.createdAt || '')))
+    .slice(0, 10);
+
+  document.getElementById('weekly-ranking-tab').classList.toggle('active', isWeekly);
+  document.getElementById('monthly-ranking-tab').classList.toggle('active', !isWeekly);
+  document.getElementById('weekly-ranking-tab').setAttribute('aria-selected', String(isWeekly));
+  document.getElementById('monthly-ranking-tab').setAttribute('aria-selected', String(!isWeekly));
+  document.getElementById('ranking-note').textContent =
+    `直近${days}日間に得た「をかし」`;
+
+  const list = document.getElementById('ranking-list');
+  list.replaceChildren();
+  if (!ranked.length) {
+    const empty = document.createElement('div');
+    empty.className = 'ranking-empty';
+    empty.textContent = 'この期間の「をかし」はまだありません。心に残った句へ「をかし」を贈ってみてください。';
+    list.append(empty);
+    return;
+  }
+
+  ranked.forEach((entry, index) => {
+    const button = document.createElement('button');
+    button.className = 'ranking-item';
+    button.type = 'button';
+    button.setAttribute('aria-label', `${index + 1}位 ${entry.haiku.author} をかし${entry.score}`);
+    const position = document.createElement('span');
+    position.className = 'ranking-position';
+    position.textContent = String(index + 1);
+    const content = document.createElement('span');
+    const haiku = document.createElement('span');
+    haiku.className = 'ranking-haiku';
+    haiku.textContent = String(entry.haiku.haiku).replace(/\n/g, ' / ');
+    const author = document.createElement('span');
+    author.className = 'ranking-author';
+    author.textContent = `${entry.haiku.author}・${entry.haiku.name}`;
+    content.append(haiku, author);
+    const score = document.createElement('span');
+    score.className = 'ranking-score';
+    score.textContent = `をかし ${entry.score}`;
+    button.append(position, content, score);
+    button.addEventListener('click', () => {
+      closeRankingPanel();
+      showCard(entry.haiku);
+      map.flyTo({
+        center: [entry.haiku.lng, entry.haiku.lat],
+        zoom: Math.max(map.getZoom(), 7),
+        essential: true,
+      });
+    });
+    list.append(button);
+  });
+}
+
+function setupAccountSystem() {
+  document.getElementById('login-tab').addEventListener('click', () => setAuthMode('login'));
+  document.getElementById('signup-tab').addEventListener('click', () => setAuthMode('signup'));
+  document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
+  document.getElementById('account-button').addEventListener('click', toggleProfilePanel);
+  document.querySelector('.profile-close').addEventListener('click', closeProfilePanel);
+  document.getElementById('profile-form').addEventListener('submit', saveProfile);
+  document.getElementById('profile-icon-file').addEventListener('change', handleIconUpload);
+  document.getElementById('remove-icon-image').addEventListener('click', () => {
+    pendingIconImage = '';
+    renderUserIcon(document.getElementById('profile-preview-icon'), { icon: '🌿' });
+    document.getElementById('profile-icon-file').value = '';
+    document.getElementById('profile-message').textContent = '画像を外すにはプロフィールを保存してください。';
+  });
+  document.getElementById('logout-button').addEventListener('click', logout);
+  document.getElementById('friend-button').addEventListener('click', toggleCurrentFriend);
+  document.getElementById('delete-haiku-button').addEventListener('click', deleteCurrentHaiku);
+
+  document.getElementById('compose-author').readOnly = true;
+  document.getElementById('reply-author').readOnly = true;
+  setAuthMode('login');
+
+  if (getCurrentUser()) {
+    hideAuthGate();
+    renderAccountUI();
+  } else {
+    currentUserId = null;
+    showAuthGate();
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode === 'signup' ? 'signup' : 'login';
+  const isSignup = authMode === 'signup';
+  document.getElementById('login-tab').classList.toggle('active', !isSignup);
+  document.getElementById('signup-tab').classList.toggle('active', isSignup);
+  document.getElementById('login-tab').setAttribute('aria-selected', String(!isSignup));
+  document.getElementById('signup-tab').setAttribute('aria-selected', String(isSignup));
+  document.getElementById('signup-name-field').hidden = !isSignup;
+  document.getElementById('auth-display-name').required = isSignup;
+  document.getElementById('auth-password').autocomplete = isSignup ? 'new-password' : 'current-password';
+  document.getElementById('auth-submit').textContent = isSignup ? 'アカウントを作る' : 'ログイン';
+  document.getElementById('auth-message').textContent = '';
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const username = document.getElementById('auth-username').value.trim().toLowerCase();
+  const password = document.getElementById('auth-password').value;
+  const displayName = document.getElementById('auth-display-name').value.trim();
+  const message = document.getElementById('auth-message');
+
+  if (username.length < 3 || /\s/.test(username)) {
+    message.textContent = 'ユーザー名は空白なしで3文字以上にしてください。';
+    return;
+  }
+
+  const passwordHash = await hashPassword(password);
+  if (authMode === 'signup') {
+    if (!displayName) {
+      message.textContent = 'アカウントの名前を入力してください。';
+      return;
+    }
+    if (Object.values(usersStore).some(user => user.username === username)) {
+      message.textContent = 'そのユーザー名はすでに使われています。';
+      return;
+    }
+
+    const user = {
+      id: createUserId(),
+      username,
+      passwordHash,
+      displayName,
+      icon: '🌿',
+      iconImage: '',
+      bio: '',
+      createdAt: new Date().toISOString(),
+    };
+    usersStore[user.id] = user;
+    currentUserId = user.id;
+    claimLegacyContent(user.id);
+    persistAccountState();
+  } else {
+    const user = Object.values(usersStore).find(candidate => candidate.username === username);
+    if (!user || user.passwordHash !== passwordHash) {
+      message.textContent = 'ユーザー名またはパスワードが違います。';
+      return;
+    }
+    currentUserId = user.id;
+    persistSession();
+  }
+
+  form.reset();
+  hideAuthGate();
+  renderAccountUI();
+}
+
+async function hashPassword(password) {
+  if (!window.crypto?.subtle) return `local:${password}`;
+  const data = new TextEncoder().encode(password);
+  const digest = await window.crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(digest))
+    .map(byte => byte.toString(16).padStart(2, '0'))
+    .join('');
+}
+
+function createUserId() {
+  if (window.crypto?.randomUUID) return `user:${window.crypto.randomUUID()}`;
+  return `user:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function getCurrentUser() {
+  return currentUserId ? usersStore[currentUserId] || null : null;
+}
+
+function persistAccountState() {
+  if (!VERIFY_ONLY) {
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersStore));
+    localStorage.setItem(FRIENDS_STORAGE_KEY, JSON.stringify(friendsStore));
+  }
+  persistSession();
+}
+
+function persistSession() {
+  if (VERIFY_ONLY) return;
+  if (currentUserId) localStorage.setItem(SESSION_STORAGE_KEY, currentUserId);
+  else localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+function showAuthGate() {
+  closeProfilePanel();
+  document.getElementById('account-button').classList.remove('visible');
+  document.getElementById('auth-gate').classList.remove('hidden');
+}
+
+function hideAuthGate() {
+  document.getElementById('auth-gate').classList.add('hidden');
+}
+
+function renderAccountUI() {
+  const user = getCurrentUser();
+  if (!user) return;
+  const accountButton = document.getElementById('account-button');
+  accountButton.classList.add('visible');
+  renderUserIcon(document.getElementById('account-icon'), user);
+  document.getElementById('account-name').textContent = user.displayName;
+  document.getElementById('compose-author').value = user.displayName;
+  document.getElementById('reply-author').value = user.displayName;
+  renderProfilePanel();
+  if (currentHaiku) {
+    updateCardAuthor(currentHaiku);
+    updateOkashiButton(currentHaiku);
+    updateReplyArea(currentHaiku);
+    updateDeleteButton(currentHaiku);
+  }
+}
+
+function toggleProfilePanel() {
+  const panel = document.getElementById('profile-panel');
+  const willOpen = !panel.classList.contains('visible');
+  panel.classList.toggle('visible', willOpen);
+  document.getElementById('account-button').setAttribute('aria-expanded', String(willOpen));
+  if (willOpen) renderProfilePanel();
+}
+
+function closeProfilePanel() {
+  document.getElementById('profile-panel').classList.remove('visible');
+  document.getElementById('account-button').setAttribute('aria-expanded', 'false');
+}
+
+function renderProfilePanel() {
+  const user = getCurrentUser();
+  if (!user) return;
+  renderUserIcon(document.getElementById('profile-preview-icon'), user);
+  document.getElementById('profile-preview-name').textContent = user.displayName;
+  document.getElementById('profile-username').textContent = `@${user.username}`;
+  document.getElementById('profile-name').value = user.displayName;
+  pendingIconImage = user.iconImage || '';
+  document.getElementById('profile-icon-file').value = '';
+  document.getElementById('profile-bio').value = user.bio || '';
+  document.getElementById('profile-okashi').textContent = String(getReceivedOkashi(user.id));
+  document.getElementById('profile-haiku-count').textContent =
+    String(haikuData.filter(haiku => haiku.userId === user.id).length);
+  document.getElementById('profile-friend-count').textContent =
+    String(getFriendIds(user.id).length);
+  document.getElementById('profile-message').textContent = '';
+  renderFriendList();
+}
+
+function saveProfile(event) {
+  event.preventDefault();
+  const user = getCurrentUser();
+  if (!user) return;
+  const displayName = document.getElementById('profile-name').value.trim();
+  if (!displayName) return;
+
+  user.displayName = displayName;
+  user.iconImage = pendingIconImage || '';
+  user.bio = document.getElementById('profile-bio').value.trim();
+  updateAuthoredNames(user);
+  persistAccountState();
+  renderAccountUI();
+  document.getElementById('profile-panel').classList.add('visible');
+  document.getElementById('account-button').setAttribute('aria-expanded', 'true');
+  document.getElementById('profile-message').textContent = 'プロフィールを保存しました。';
+}
+
+function updateAuthoredNames(user) {
+  haikuData.forEach(haiku => {
+    if (haiku.userId === user.id) haiku.author = `— ${user.displayName}`;
+  });
+  Object.values(replyStore).forEach(replies => {
+    if (!Array.isArray(replies)) return;
+    replies.forEach(reply => {
+      if (reply.userId === user.id) reply.author = `— ${user.displayName}`;
+    });
+  });
+  if (!VERIFY_ONLY) {
+    const pins = loadLocalPins();
+    pins.forEach(haiku => {
+      if (haiku.userId === user.id) haiku.author = `— ${user.displayName}`;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+  }
+}
+
+function claimLegacyContent(userId) {
+  let changed = false;
+  haikuData.forEach(haiku => {
+    if (haiku.userId === 'demo-local') {
+      haiku.userId = userId;
+      changed = true;
+    }
+  });
+  Object.values(replyStore).forEach(replies => {
+    if (!Array.isArray(replies)) return;
+    replies.forEach(reply => {
+      if (reply.userId === 'demo-local') {
+        reply.userId = userId;
+        changed = true;
+      }
+    });
+  });
+  if (changed && !VERIFY_ONLY) {
+    const pins = loadLocalPins();
+    pins.forEach(haiku => {
+      if (haiku.userId === 'demo-local') haiku.userId = userId;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+  }
+}
+
+function logout() {
+  currentUserId = null;
+  persistSession();
+  closeCard();
+  closeProfilePanel();
+  setAuthMode('login');
+  showAuthGate();
+}
+
+function updateDeleteButton(h) {
+  const user = getCurrentUser();
+  document.getElementById('delete-haiku-button').hidden =
+    !user || h.userId !== user.id;
+}
+
+function deleteCurrentHaiku() {
+  const user = getCurrentUser();
+  if (!currentHaiku || !user || currentHaiku.userId !== user.id) return;
+  const confirmed = window.confirm('この俳句と、この句に付いた返句を削除しますか？');
+  if (!confirmed) return;
+
+  const haikuId = getHaikuId(currentHaiku);
+  haikuMarkers.get(haikuId)?.remove();
+  haikuMarkers.delete(haikuId);
+  const index = haikuData.findIndex(haiku => getHaikuId(haiku) === haikuId);
+  if (index >= 0) haikuData.splice(index, 1);
+  delete replyStore[haikuId];
+  okashiEvents = okashiEvents.filter(event => event.haikuId !== haikuId);
+
+  if (!VERIFY_ONLY) {
+    const pins = loadLocalPins().filter(haiku => getHaikuId(haiku) !== haikuId);
+    const counts = readJson(OKASHI_STORAGE_KEY, {});
+    const liked = readJson(OKASHI_LIKED_KEY, {});
+    delete counts[haikuId];
+    Object.keys(liked).forEach(key => {
+      if (key === haikuId || key.endsWith(`:${haikuId}`)) delete liked[key];
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+    localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
+    localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
+    localStorage.setItem(OKASHI_EVENTS_KEY, JSON.stringify(okashiEvents));
+  }
+
+  closeCard();
+  currentHaiku = null;
+  renderRanking();
+  renderProfilePanel();
+}
+
+function handleIconUpload(event) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  const message = document.getElementById('profile-message');
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    message.textContent = '画像ファイルを選んでください。';
+    input.value = '';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    message.textContent = '画像は2MB以下にしてください。';
+    input.value = '';
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.addEventListener('load', () => {
+    pendingIconImage = String(reader.result || '');
+    renderUserIcon(document.getElementById('profile-preview-icon'), {
+      icon: getCurrentUser()?.icon || '🌿',
+      iconImage: pendingIconImage,
+    });
+    message.textContent = '画像を選びました。プロフィールを保存してください。';
+  });
+  reader.addEventListener('error', () => {
+    message.textContent = '画像を読み込めませんでした。';
+  });
+  reader.readAsDataURL(file);
+}
+
+function renderUserIcon(target, profile) {
+  target.replaceChildren();
+  if (profile?.iconImage) {
+    const image = document.createElement('img');
+    image.src = profile.iconImage;
+    image.alt = '';
+    target.append(image);
+    return;
+  }
+  target.textContent = profile?.icon || '🌿';
+}
+
+function updateCardAuthor(h) {
+  const profile = getAuthorProfile(h);
+  document.getElementById('card-author').textContent = `— ${profile.displayName}`;
+  renderUserIcon(document.getElementById('card-author-icon'), profile);
+  const friendButton = document.getElementById('friend-button');
+  const user = getCurrentUser();
+  const isOwn = Boolean(user && profile.id === user.id);
+  friendButton.hidden = isOwn || !user;
+  friendButton.dataset.profileId = profile.id;
+  const added = user ? getFriendIds(user.id).includes(profile.id) : false;
+  friendButton.classList.toggle('added', added);
+  friendButton.textContent = added ? '俳友です' : '俳友に追加';
+}
+
+function getAuthorProfile(h) {
+  if (h.userId && usersStore[h.userId]) return usersStore[h.userId];
+  const displayName = String(h.author || '作者不詳').replace(/^[-—]\s*/, '');
+  const id = h.userId || `author:${simpleHash(displayName)}`;
+  const icons = ['✒️', '🌙', '🌿', '🍁', '🐦'];
+  return {
+    id,
+    displayName,
+    icon: icons[parseInt(simpleHash(displayName), 36) % icons.length] || '✒️',
+    bio: `${h.theme || '俳句'}を詠む俳人`,
+  };
+}
+
+function getProfileById(profileId) {
+  if (usersStore[profileId]) return usersStore[profileId];
+  const haiku = haikuData.find(item => getAuthorProfile(item).id === profileId);
+  return haiku ? getAuthorProfile(haiku) : null;
+}
+
+function simpleHash(text) {
+  let hash = 0;
+  for (const character of String(text)) {
+    hash = (hash * 31 + character.codePointAt(0)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function getFriendIds(userId) {
+  return Array.isArray(friendsStore[userId]) ? friendsStore[userId] : [];
+}
+
+function toggleCurrentFriend() {
+  const user = getCurrentUser();
+  const profileId = document.getElementById('friend-button').dataset.profileId;
+  if (!user || !profileId || profileId === user.id) return;
+  const friendIds = getFriendIds(user.id);
+  const index = friendIds.indexOf(profileId);
+  if (index >= 0) friendIds.splice(index, 1);
+  else friendIds.push(profileId);
+  friendsStore[user.id] = friendIds;
+  persistAccountState();
+  updateCardAuthor(currentHaiku);
+  renderProfilePanel();
+}
+
+function renderFriendList() {
+  const user = getCurrentUser();
+  const list = document.getElementById('friend-list');
+  list.replaceChildren();
+  if (!user) return;
+  const profiles = getFriendIds(user.id).map(getProfileById).filter(Boolean);
+  if (!profiles.length) {
+    const empty = document.createElement('div');
+    empty.className = 'friend-empty';
+    empty.textContent = '俳句カードから作者を俳友に追加できます。';
+    list.append(empty);
+    return;
+  }
+
+  profiles.forEach(profile => {
+    const item = document.createElement('div');
+    item.className = 'friend-item';
+    const icon = document.createElement('span');
+    icon.className = 'user-icon';
+    renderUserIcon(icon, profile);
+    const info = document.createElement('div');
+    info.className = 'friend-info';
+    const name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = profile.displayName;
+    const bio = document.createElement('div');
+    bio.className = 'friend-bio';
+    bio.textContent = profile.bio || 'まだbioはありません';
+    info.append(name, bio);
+    const remove = document.createElement('button');
+    remove.className = 'friend-remove';
+    remove.type = 'button';
+    remove.textContent = '解除';
+    remove.setAttribute('aria-label', `${profile.displayName}を俳友から解除`);
+    remove.addEventListener('click', () => {
+      friendsStore[user.id] = getFriendIds(user.id).filter(id => id !== profile.id);
+      persistAccountState();
+      renderProfilePanel();
+      if (currentHaiku) updateCardAuthor(currentHaiku);
+    });
+    item.append(icon, info, remove);
+    list.append(item);
+  });
+}
+
+function getReceivedOkashi(userId) {
+  const haikuCounts = readJson(OKASHI_STORAGE_KEY, {});
+  const haikuTotal = haikuData
+    .filter(haiku => haiku.userId === userId)
+    .reduce((sum, haiku) => sum + Number(haikuCounts[getHaikuId(haiku)] || 0), 0);
+  const replyTotal = Object.values(replyStore)
+    .flatMap(replies => Array.isArray(replies) ? replies : [])
+    .filter(reply => reply.userId === userId)
+    .reduce((sum, reply) => sum + Number(replyOkashiCounts[reply.id] || 0), 0);
+  return haikuTotal + replyTotal;
 }
 
 function getHaikuId(h) {
