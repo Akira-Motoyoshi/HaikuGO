@@ -9,6 +9,9 @@
   <title>俳句GO — 場所が俳句になる地図</title>
   <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
   <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -226,6 +229,17 @@
       font-family: 'Noto Serif JP', serif;
       font-size: 11px;
       letter-spacing: 0.28em;
+      cursor: pointer;
+    }
+
+    .auth-secondary {
+      border: 0;
+      background: transparent;
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-align: left;
       cursor: pointer;
     }
 
@@ -1289,14 +1303,15 @@
         <input id="auth-display-name" type="text" autocomplete="name" maxlength="24">
       </label>
       <label class="auth-field">
-        ユーザー名
-        <input id="auth-username" type="text" autocomplete="username" maxlength="24" required>
+        メールアドレス
+        <input id="auth-username" type="email" autocomplete="email" maxlength="120" required>
       </label>
       <label class="auth-field">
         パスワード
-        <input id="auth-password" type="password" autocomplete="current-password" minlength="4" required>
+        <input id="auth-password" type="password" autocomplete="current-password" minlength="6" required>
       </label>
       <div id="auth-message" aria-live="polite"></div>
+      <button class="auth-secondary" id="forgot-password" type="button">パスワードを忘れた場合</button>
       <button class="auth-submit" id="auth-submit" type="submit">ログイン</button>
     </form>
   </div>
@@ -1525,6 +1540,19 @@
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoiYWtpLWFvZ2FrdSIsImEiOiJjbXA5cW0zaHcwbGZkMnBvZ2RleTM5b2sxIn0.7Gj-P35EuhV7W7iMhN6Plw';
 
+const firebaseConfig = {
+  apiKey: 'AIzaSyBFBhWEUOoi3LA2EEQezWVH9q4DgFm5EnI',
+  authDomain: 'haikugo-bacbb.firebaseapp.com',
+  projectId: 'haikugo-bacbb',
+  storageBucket: 'haikugo-bacbb.firebasestorage.app',
+  messagingSenderId: '340008511163',
+  appId: '1:340008511163:web:3df67ebc10131903716b9e',
+};
+const CLOUD_ENABLED = Boolean(window.firebase);
+if (CLOUD_ENABLED && !firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const cloudAuth = CLOUD_ENABLED ? firebase.auth() : null;
+const cloudDb = CLOUD_ENABLED ? firebase.firestore() : null;
+
 const STORAGE_KEY = 'haiku_go_local_pins_v1';
 const OKASHI_STORAGE_KEY = 'haiku_go_okashi_counts_v1';
 const OKASHI_LIKED_KEY = 'haiku_go_okashi_liked_v1';
@@ -1557,6 +1585,9 @@ let okashiEvents = Array.isArray(readJson(OKASHI_EVENTS_KEY, []))
 let pendingIconImage = null;
 let rankingPeriod = 'weekly';
 const haikuMarkers = new Map();
+const cloudUnsubscribers = [];
+const cloudHaikuIds = new Set();
+let cloudSyncStarted = false;
 
 const haikuData = [
   // --- 既存10カ所 ---
@@ -1623,6 +1654,14 @@ const haikuData = [
   { name: "別府温泉 / 大分県", lng: 131.4908, lat: 33.2841, haiku: "地獄湯や\n湯気に霞む\n冬の朝", author: "— 作者不詳", theme: "冬・温泉", color: "#e8a0a0" },
   { name: "那覇 / 沖縄県", lng: 127.6791, lat: 26.2124, haiku: "珊瑚礁\n南の海や\n夏果てず", author: "— 作者不詳", theme: "夏・海", color: "#90c4e8" },
   { name: "竹富島 / 沖縄県", lng: 124.0639, lat: 24.3244, haiku: "珊瑚の道\n三線の音\n夕なぎ", author: "— 作者不詳", theme: "夏・島", color: "#90c4e8" },
+
+  // --- 海外の初期英語俳句・俳句に影響を受けた短詩 ---
+  { name: "Paris Métro / France", lng: 2.3522, lat: 48.8566, haiku: "The apparition of these faces in the crowd:\nPetals on a wet, black bough.", author: "— Ezra Pound", theme: "海外・都市", color: "#e8a0a0", language: "en", international: true },
+  { name: "Boston / Massachusetts, USA", lng: -71.0589, lat: 42.3601, haiku: "Is it a dragon fly or maple leaf\nThat settles softly down upon the water?", author: "— Amy Lowell", theme: "海外・秋", color: "#e8d9a0", language: "en", international: true },
+  { name: "Philadelphia / Pennsylvania, USA", lng: -75.1652, lat: 39.9526, haiku: "White petals afloat\nOn a winding woodland stream—\nWhat else is life's dream!", author: "— Sadakichi Hartmann", theme: "海外・春", color: "#90c4e8", language: "en", international: true },
+  { name: "Greenwich Village / New York, USA", lng: -74.0027, lat: 40.7336, haiku: "Butterflies a-wing—\nAre you flowers returning\nTo your branch in Spring?", author: "— Sadakichi Hartmann", theme: "海外・春", color: "#e8d9a0", language: "en", international: true },
+  { name: "Morongo Valley / California, USA", lng: -116.5809, lat: 34.0469, haiku: "At new moon we met!\nTwo weeks I've waited in vain.\nTo-night!—Don't forget.", author: "— Sadakichi Hartmann", theme: "海外・月", color: "#e8a0a0", language: "en", international: true },
+  { name: "St. Petersburg / Florida, USA", lng: -82.6403, lat: 27.7676, haiku: "Oh, red maple leaves,\nThere seem more of you these eves\nThan ever grew on trees.", author: "— Sadakichi Hartmann", theme: "海外・秋", color: "#e8d9a0", language: "en", international: true },
 ];
 
 const map = new mapboxgl.Map({
@@ -1658,7 +1697,7 @@ let isPickingLocation = false;
 let currentHaiku = null;
 
 haikuData.forEach(addHaikuMarker);
-if (!VERIFY_ONLY) {
+if (!VERIFY_ONLY && !CLOUD_ENABLED) {
   loadLocalPins().forEach(h => {
     haikuData.push(h);
     addHaikuMarker(h);
@@ -1932,7 +1971,7 @@ function updateDraftMarkerColor() {
   draftMarker.getElement().innerHTML = markerSvg(getSelectedColor());
 }
 
-function submitComposeForm(form) {
+async function submitComposeForm(form) {
   const user = getCurrentUser();
   if (!user) {
     showAuthGate();
@@ -1967,7 +2006,21 @@ function submitComposeForm(form) {
 
   haikuData.push(h);
   addHaikuMarker(h);
-  if (!VERIFY_ONLY) saveLocalPin(h);
+  if (CLOUD_ENABLED) {
+    try {
+      await cloudDb.collection('haikus').doc(h.id).set(serializeHaiku(h));
+      cloudHaikuIds.add(h.id);
+    } catch {
+      haikuMarkers.get(h.id)?.remove();
+      haikuMarkers.delete(h.id);
+      const failedIndex = haikuData.findIndex(item => getHaikuId(item) === h.id);
+      if (failedIndex >= 0) haikuData.splice(failedIndex, 1);
+      setComposeMessage('オンライン保存に失敗しました。通信状態を確認してください。', true);
+      return;
+    }
+  } else if (!VERIFY_ONLY) {
+    saveLocalPin(h);
+  }
   if (draftMarker) draftMarker.remove();
   draftMarker = null;
   draftLocation = null;
@@ -2015,15 +2068,17 @@ function setComposeMessage(text, warn = false) {
   message.classList.toggle('warn', warn);
 }
 
-function toggleOkashi() {
+async function toggleOkashi() {
   const user = getCurrentUser();
   if (!currentHaiku || !user) return;
 
   const id = getHaikuId(currentHaiku);
-  const counts = readJson(OKASHI_STORAGE_KEY, {});
+  const counts = getHaikuOkashiCounts();
   const liked = readJson(OKASHI_LIKED_KEY, {});
   const likedKey = `${user.id}:${id}`;
-  const wasLiked = Boolean(liked[likedKey]);
+  const wasLiked = CLOUD_ENABLED
+    ? okashiEvents.some(event => event.haikuId === id && event.userId === user.id)
+    : Boolean(liked[likedKey]);
   const nextCount = Math.max(0, Number(counts[id] || 0) + (wasLiked ? -1 : 1));
 
   counts[id] = nextCount;
@@ -2039,7 +2094,16 @@ function toggleOkashi() {
       createdAt: new Date().toISOString(),
     });
   }
-  if (!VERIFY_ONLY) {
+  if (CLOUD_ENABLED) {
+    const reactionId = `${user.id}_${simpleHash(id)}`;
+    const reference = cloudDb.collection('haikuReactions').doc(reactionId);
+    if (wasLiked) await reference.delete();
+    else await reference.set({
+      haikuId: id,
+      userId: user.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } else if (!VERIFY_ONLY) {
     localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
     localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
     localStorage.setItem(OKASHI_EVENTS_KEY, JSON.stringify(okashiEvents));
@@ -2053,14 +2117,25 @@ function toggleOkashi() {
 function updateOkashiButton(h) {
   const user = getCurrentUser();
   const id = getHaikuId(h);
-  const counts = readJson(OKASHI_STORAGE_KEY, {});
+  const counts = getHaikuOkashiCounts();
   const liked = readJson(OKASHI_LIKED_KEY, {});
   const button = document.getElementById('okashi-button');
 
   document.getElementById('okashi-count').textContent = String(Number(counts[id] || 0));
   const likedKey = user ? `${user.id}:${id}` : id;
-  button.classList.toggle('liked', Boolean(liked[likedKey]));
-  button.setAttribute('aria-pressed', String(Boolean(liked[likedKey])));
+  const isLiked = CLOUD_ENABLED
+    ? okashiEvents.some(event => event.haikuId === id && event.userId === user?.id)
+    : Boolean(liked[likedKey]);
+  button.classList.toggle('liked', isLiked);
+  button.setAttribute('aria-pressed', String(isLiked));
+}
+
+function getHaikuOkashiCounts() {
+  if (!CLOUD_ENABLED) return readJson(OKASHI_STORAGE_KEY, {});
+  return okashiEvents.reduce((counts, event) => {
+    counts[event.haikuId] = Number(counts[event.haikuId] || 0) + 1;
+    return counts;
+  }, {});
 }
 
 function resetReplyForm() {
@@ -2130,7 +2205,7 @@ function renderReplies(replies) {
   });
 }
 
-function toggleReplyOkashi(replyId) {
+async function toggleReplyOkashi(replyId) {
   const user = getCurrentUser();
   if (!currentHaiku || !user) return;
   const likedKey = `${user.id}:${replyId}`;
@@ -2141,14 +2216,23 @@ function toggleReplyOkashi(replyId) {
     Number(replyOkashiCounts[replyId] || 0) + (wasLiked ? -1 : 1)
   );
   replyOkashiLiked[likedKey] = !wasLiked;
-  if (!VERIFY_ONLY) {
+  if (CLOUD_ENABLED) {
+    const reactionId = `${user.id}_${simpleHash(replyId)}`;
+    const reference = cloudDb.collection('replyReactions').doc(reactionId);
+    if (wasLiked) await reference.delete();
+    else await reference.set({
+      replyId,
+      userId: user.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } else if (!VERIFY_ONLY) {
     localStorage.setItem(REPLY_OKASHI_STORAGE_KEY, JSON.stringify(replyOkashiCounts));
     localStorage.setItem(REPLY_OKASHI_LIKED_KEY, JSON.stringify(replyOkashiLiked));
   }
   renderReplies(getReplies(getHaikuId(currentHaiku)));
 }
 
-function submitReply(event) {
+async function submitReply(event) {
   event.preventDefault();
   const user = getCurrentUser();
   if (!user) {
@@ -2181,7 +2265,21 @@ function submitReply(event) {
   const replies = Array.isArray(replyStore[haikuId]) ? replyStore[haikuId] : [];
   replies.push(reply);
   replyStore[haikuId] = replies;
-  if (!VERIFY_ONLY) localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+  if (CLOUD_ENABLED) {
+    try {
+      await cloudDb.collection('replies').doc(reply.id).set({
+        ...reply,
+        haikuId,
+      });
+    } catch {
+      replies.pop();
+      if (!replies.length) delete replyStore[haikuId];
+      setReplyMessage('オンライン保存に失敗しました。', true);
+      return;
+    }
+  } else if (!VERIFY_ONLY) {
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+  }
 
   form.reset();
   document.getElementById('reply-count').textContent = String(replies.length);
@@ -2311,6 +2409,7 @@ function setupAccountSystem() {
   document.getElementById('login-tab').addEventListener('click', () => setAuthMode('login'));
   document.getElementById('signup-tab').addEventListener('click', () => setAuthMode('signup'));
   document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
+  document.getElementById('forgot-password').addEventListener('click', sendPasswordReset);
   document.getElementById('account-button').addEventListener('click', toggleProfilePanel);
   document.querySelector('.profile-close').addEventListener('click', closeProfilePanel);
   document.getElementById('profile-form').addEventListener('submit', saveProfile);
@@ -2329,12 +2428,14 @@ function setupAccountSystem() {
   document.getElementById('reply-author').readOnly = true;
   setAuthMode('login');
 
-  if (getCurrentUser()) {
-    hideAuthGate();
-    renderAccountUI();
+  if (CLOUD_ENABLED) {
+    showAuthGate();
+    cloudAuth.onAuthStateChanged(handleCloudAuthState);
   } else {
     currentUserId = null;
     showAuthGate();
+    document.getElementById('auth-message').textContent =
+      'オンライン認証を読み込めません。ページを再読み込みしてください。';
   }
 }
 
@@ -2360,63 +2461,123 @@ async function handleAuthSubmit(event) {
   const displayName = document.getElementById('auth-display-name').value.trim();
   const message = document.getElementById('auth-message');
 
-  if (username.length < 3 || /\s/.test(username)) {
-    message.textContent = 'ユーザー名は空白なしで3文字以上にしてください。';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+    message.textContent = '正しいメールアドレスを入力してください。';
     return;
   }
 
-  const passwordHash = await hashPassword(password);
-  if (authMode === 'signup') {
-    if (!displayName) {
-      message.textContent = 'アカウントの名前を入力してください。';
-      return;
-    }
-    if (Object.values(usersStore).some(user => user.username === username)) {
-      message.textContent = 'そのユーザー名はすでに使われています。';
-      return;
-    }
-
-    const user = {
-      id: createUserId(),
-      username,
-      passwordHash,
-      displayName,
-      icon: '🌿',
-      iconImage: '',
-      bio: '',
-      createdAt: new Date().toISOString(),
-    };
-    usersStore[user.id] = user;
-    currentUserId = user.id;
-    claimLegacyContent(user.id);
-    persistAccountState();
-  } else {
-    const user = Object.values(usersStore).find(candidate => candidate.username === username);
-    if (!user || user.passwordHash !== passwordHash) {
-      message.textContent = 'ユーザー名またはパスワードが違います。';
-      return;
-    }
-    currentUserId = user.id;
-    persistSession();
+  if (!CLOUD_ENABLED) {
+    message.textContent = 'オンライン認証を読み込めません。ページを再読み込みしてください。';
+    return;
   }
+  await handleFirebaseAuth(form, username, password, displayName, message);
+}
 
-  form.reset();
+async function handleFirebaseAuth(form, email, password, displayName, message) {
+  const submit = document.getElementById('auth-submit');
+  submit.disabled = true;
+  message.textContent = authMode === 'signup' ? 'アカウントを作成しています。' : 'ログインしています。';
+
+  try {
+    if (authMode === 'signup') {
+      if (!displayName) {
+        message.textContent = 'アカウントの名前を入力してください。';
+        return;
+      }
+      const credential = await cloudAuth.createUserWithEmailAndPassword(email, password);
+      await credential.user.updateProfile({ displayName });
+      await cloudDb.collection('users').doc(credential.user.uid).set({
+        id: credential.user.uid,
+        displayName,
+        icon: '🌿',
+        iconImage: '',
+        bio: '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      await credential.user.sendEmailVerification({
+        url: 'https://akira-motoyoshi.github.io/HaikuGO/',
+      });
+      await cloudAuth.signOut();
+      form.reset();
+      setAuthMode('login');
+      message.textContent = '確認メールを送信しました。メール内のリンクを開いてからログインしてください。';
+      return;
+    }
+
+    const credential = await cloudAuth.signInWithEmailAndPassword(email, password);
+    if (!credential.user.emailVerified) {
+      await credential.user.sendEmailVerification({
+        url: 'https://akira-motoyoshi.github.io/HaikuGO/',
+      });
+      await cloudAuth.signOut();
+      message.textContent = 'メール確認が必要です。確認メールを再送しました。';
+      return;
+    }
+    form.reset();
+  } catch (error) {
+    const messages = {
+      'auth/email-already-in-use': 'このメールアドレスはすでに登録されています。',
+      'auth/invalid-credential': 'メールアドレスまたはパスワードが違います。',
+      'auth/invalid-email': '正しいメールアドレスを入力してください。',
+      'auth/weak-password': 'パスワードは6文字以上にしてください。',
+      'auth/too-many-requests': '試行回数が多すぎます。時間をおいて再度お試しください。',
+    };
+    message.textContent = messages[error.code] || '認証に失敗しました。もう一度お試しください。';
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function sendPasswordReset() {
+  const email = document.getElementById('auth-username').value.trim().toLowerCase();
+  const message = document.getElementById('auth-message');
+  if (!CLOUD_ENABLED) {
+    message.textContent = 'オンライン認証を利用できません。';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    message.textContent = '先にメールアドレスを入力してください。';
+    return;
+  }
+  try {
+    await cloudAuth.sendPasswordResetEmail(email, {
+      url: 'https://akira-motoyoshi.github.io/HaikuGO/',
+    });
+    message.textContent = 'パスワード再設定メールを送信しました。';
+  } catch {
+    message.textContent = '再設定メールを送信できませんでした。';
+  }
+}
+
+async function handleCloudAuthState(firebaseUser) {
+  if (!firebaseUser) {
+    stopCloudSync();
+    currentUserId = null;
+    showAuthGate();
+    return;
+  }
+  if (!firebaseUser.emailVerified) {
+    stopCloudSync();
+    currentUserId = null;
+    showAuthGate();
+    return;
+  }
+  const userDoc = await cloudDb.collection('users').doc(firebaseUser.uid).get();
+  const profile = userDoc.exists ? userDoc.data() : {
+    id: firebaseUser.uid,
+    displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+    icon: '🌿',
+    iconImage: '',
+    bio: '',
+  };
+  profile.id = firebaseUser.uid;
+  profile.username = firebaseUser.email;
+  usersStore[firebaseUser.uid] = profile;
+  currentUserId = firebaseUser.uid;
   hideAuthGate();
   renderAccountUI();
-}
-
-async function hashPassword(password) {
-  if (!window.crypto?.subtle) return `local:${password}`;
-  const data = new TextEncoder().encode(password);
-  const digest = await window.crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(digest))
-    .map(byte => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function createUserId() {
-  if (window.crypto?.randomUUID) return `user:${window.crypto.randomUUID()}`;
-  return `user:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+  startCloudSync();
+  await migrateLocalContentToCloud();
 }
 
 function getCurrentUser() {
@@ -2424,6 +2585,23 @@ function getCurrentUser() {
 }
 
 function persistAccountState() {
+  if (CLOUD_ENABLED && currentUserId) {
+    const user = getCurrentUser();
+    cloudDb.collection('users').doc(currentUserId).set({
+      id: user.id,
+      displayName: user.displayName,
+      icon: user.icon || '🌿',
+      iconImage: user.iconImage || '',
+      bio: user.bio || '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    cloudDb.collection('friendships').doc(currentUserId).set({
+      userId: currentUserId,
+      friendIds: getFriendIds(currentUserId),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return;
+  }
   if (!VERIFY_ONLY) {
     localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersStore));
     localStorage.setItem(FRIENDS_STORAGE_KEY, JSON.stringify(friendsStore));
@@ -2432,6 +2610,7 @@ function persistAccountState() {
 }
 
 function persistSession() {
+  if (CLOUD_ENABLED) return;
   if (VERIFY_ONLY) return;
   if (currentUserId) localStorage.setItem(SESSION_STORAGE_KEY, currentUserId);
   else localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -2483,7 +2662,8 @@ function renderProfilePanel() {
   if (!user) return;
   renderUserIcon(document.getElementById('profile-preview-icon'), user);
   document.getElementById('profile-preview-name').textContent = user.displayName;
-  document.getElementById('profile-username').textContent = `@${user.username}`;
+  const accountEmail = CLOUD_ENABLED ? cloudAuth.currentUser?.email : user.username;
+  document.getElementById('profile-username').textContent = accountEmail || '';
   document.getElementById('profile-name').value = user.displayName;
   pendingIconImage = user.iconImage || '';
   document.getElementById('profile-icon-file').value = '';
@@ -2497,7 +2677,7 @@ function renderProfilePanel() {
   renderFriendList();
 }
 
-function saveProfile(event) {
+async function saveProfile(event) {
   event.preventDefault();
   const user = getCurrentUser();
   if (!user) return;
@@ -2508,7 +2688,19 @@ function saveProfile(event) {
   user.iconImage = pendingIconImage || '';
   user.bio = document.getElementById('profile-bio').value.trim();
   updateAuthoredNames(user);
-  persistAccountState();
+  if (CLOUD_ENABLED) {
+    await cloudAuth.currentUser?.updateProfile({ displayName });
+    await cloudDb.collection('users').doc(user.id).set({
+      id: user.id,
+      displayName: user.displayName,
+      icon: user.icon || '🌿',
+      iconImage: user.iconImage,
+      bio: user.bio,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } else {
+    persistAccountState();
+  }
   renderAccountUI();
   document.getElementById('profile-panel').classList.add('visible');
   document.getElementById('account-button').setAttribute('aria-expanded', 'true');
@@ -2525,7 +2717,17 @@ function updateAuthoredNames(user) {
       if (reply.userId === user.id) reply.author = `— ${user.displayName}`;
     });
   });
-  if (!VERIFY_ONLY) {
+  if (CLOUD_ENABLED) {
+    Promise.all([
+      cloudDb.collection('haikus').where('userId', '==', user.id).get(),
+      cloudDb.collection('replies').where('userId', '==', user.id).get(),
+    ]).then(([haikus, replies]) => {
+      const batch = cloudDb.batch();
+      haikus.forEach(document => batch.update(document.ref, { author: `— ${user.displayName}` }));
+      replies.forEach(document => batch.update(document.ref, { author: `— ${user.displayName}` }));
+      return batch.commit();
+    });
+  } else if (!VERIFY_ONLY) {
     const pins = loadLocalPins();
     pins.forEach(haiku => {
       if (haiku.userId === user.id) haiku.author = `— ${user.displayName}`;
@@ -2535,34 +2737,14 @@ function updateAuthoredNames(user) {
   }
 }
 
-function claimLegacyContent(userId) {
-  let changed = false;
-  haikuData.forEach(haiku => {
-    if (haiku.userId === 'demo-local') {
-      haiku.userId = userId;
-      changed = true;
-    }
-  });
-  Object.values(replyStore).forEach(replies => {
-    if (!Array.isArray(replies)) return;
-    replies.forEach(reply => {
-      if (reply.userId === 'demo-local') {
-        reply.userId = userId;
-        changed = true;
-      }
-    });
-  });
-  if (changed && !VERIFY_ONLY) {
-    const pins = loadLocalPins();
-    pins.forEach(haiku => {
-      if (haiku.userId === 'demo-local') haiku.userId = userId;
-    });
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
-    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
-  }
-}
-
 function logout() {
+  if (CLOUD_ENABLED) {
+    cloudAuth.signOut();
+    closeCard();
+    closeProfilePanel();
+    setAuthMode('login');
+    return;
+  }
   currentUserId = null;
   persistSession();
   closeCard();
@@ -2577,13 +2759,27 @@ function updateDeleteButton(h) {
     !user || h.userId !== user.id;
 }
 
-function deleteCurrentHaiku() {
+async function deleteCurrentHaiku() {
   const user = getCurrentUser();
   if (!currentHaiku || !user || currentHaiku.userId !== user.id) return;
   const confirmed = window.confirm('この俳句と、この句に付いた返句を削除しますか？');
   if (!confirmed) return;
 
   const haikuId = getHaikuId(currentHaiku);
+  if (CLOUD_ENABLED) {
+    const batch = cloudDb.batch();
+    batch.delete(cloudDb.collection('haikus').doc(haikuId));
+    const [replies, reactions] = await Promise.all([
+      cloudDb.collection('replies').where('haikuId', '==', haikuId).get(),
+      cloudDb.collection('haikuReactions').where('haikuId', '==', haikuId).get(),
+    ]);
+    replies.forEach(document => batch.delete(document.ref));
+    reactions.forEach(document => batch.delete(document.ref));
+    await batch.commit();
+    closeCard();
+    currentHaiku = null;
+    return;
+  }
   haikuMarkers.get(haikuId)?.remove();
   haikuMarkers.delete(haikuId);
   const index = haikuData.findIndex(haiku => getHaikuId(haiku) === haikuId);
@@ -2612,7 +2808,7 @@ function deleteCurrentHaiku() {
   renderProfilePanel();
 }
 
-function handleIconUpload(event) {
+async function handleIconUpload(event) {
   const input = event.currentTarget;
   const file = input.files?.[0];
   const message = document.getElementById('profile-message');
@@ -2628,19 +2824,41 @@ function handleIconUpload(event) {
     return;
   }
 
-  const reader = new FileReader();
-  reader.addEventListener('load', () => {
-    pendingIconImage = String(reader.result || '');
+  try {
+    pendingIconImage = await compressProfileImage(file);
     renderUserIcon(document.getElementById('profile-preview-icon'), {
       icon: getCurrentUser()?.icon || '🌿',
       iconImage: pendingIconImage,
     });
     message.textContent = '画像を選びました。プロフィールを保存してください。';
-  });
-  reader.addEventListener('error', () => {
+  } catch {
     message.textContent = '画像を読み込めませんでした。';
+  }
+}
+
+function compressProfileImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('error', reject);
+    reader.addEventListener('load', () => {
+      const image = new Image();
+      image.addEventListener('error', reject);
+      image.addEventListener('load', () => {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext('2d');
+        const scale = Math.max(size / image.width, size / image.height);
+        const width = image.width * scale;
+        const height = image.height * scale;
+        context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      });
+      image.src = String(reader.result || '');
+    });
+    reader.readAsDataURL(file);
   });
-  reader.readAsDataURL(file);
 }
 
 function renderUserIcon(target, profile) {
@@ -2760,7 +2978,7 @@ function renderFriendList() {
 }
 
 function getReceivedOkashi(userId) {
-  const haikuCounts = readJson(OKASHI_STORAGE_KEY, {});
+  const haikuCounts = getHaikuOkashiCounts();
   const haikuTotal = haikuData
     .filter(haiku => haiku.userId === userId)
     .reduce((sum, haiku) => sum + Number(haikuCounts[getHaikuId(haiku)] || 0), 0);
@@ -2769,6 +2987,131 @@ function getReceivedOkashi(userId) {
     .filter(reply => reply.userId === userId)
     .reduce((sum, reply) => sum + Number(replyOkashiCounts[reply.id] || 0), 0);
   return haikuTotal + replyTotal;
+}
+
+function startCloudSync() {
+  if (!CLOUD_ENABLED || cloudSyncStarted || !currentUserId) return;
+  cloudSyncStarted = true;
+
+  cloudUnsubscribers.push(
+    cloudDb.collection('users').onSnapshot(snapshot => {
+      snapshot.forEach(document => {
+        usersStore[document.id] = {
+          ...usersStore[document.id],
+          id: document.id,
+          ...document.data(),
+        };
+      });
+      renderAccountUI();
+      if (currentHaiku) updateCardAuthor(currentHaiku);
+    }),
+    cloudDb.collection('haikus').onSnapshot(snapshot => {
+      cloudHaikuIds.forEach(id => {
+        haikuMarkers.get(id)?.remove();
+        haikuMarkers.delete(id);
+        const index = haikuData.findIndex(haiku => getHaikuId(haiku) === id);
+        if (index >= 0) haikuData.splice(index, 1);
+      });
+      cloudHaikuIds.clear();
+
+      snapshot.forEach(document => {
+        const h = deserializeCloudData({ id: document.id, ...document.data() });
+        if (!h.name || !h.haiku || !Number.isFinite(h.lng) || !Number.isFinite(h.lat)) return;
+        cloudHaikuIds.add(h.id);
+        haikuData.push(h);
+        addHaikuMarker(h);
+      });
+      renderRanking();
+      renderProfilePanel();
+    }),
+    cloudDb.collection('replies').onSnapshot(snapshot => {
+      replyStore = {};
+      snapshot.forEach(document => {
+        const reply = deserializeCloudData({ id: document.id, ...document.data() });
+        if (!reply.haikuId) return;
+        if (!replyStore[reply.haikuId]) replyStore[reply.haikuId] = [];
+        replyStore[reply.haikuId].push(reply);
+      });
+      if (currentHaiku) updateReplyArea(currentHaiku);
+    }),
+    cloudDb.collection('haikuReactions').onSnapshot(snapshot => {
+      okashiEvents = [];
+      snapshot.forEach(document => {
+        okashiEvents.push(deserializeCloudData({ id: document.id, ...document.data() }));
+      });
+      if (currentHaiku) updateOkashiButton(currentHaiku);
+      renderRanking();
+      renderProfilePanel();
+    }),
+    cloudDb.collection('replyReactions').onSnapshot(snapshot => {
+      replyOkashiCounts = {};
+      replyOkashiLiked = {};
+      snapshot.forEach(document => {
+        const reaction = deserializeCloudData({ id: document.id, ...document.data() });
+        if (!reaction.replyId) return;
+        replyOkashiCounts[reaction.replyId] = Number(replyOkashiCounts[reaction.replyId] || 0) + 1;
+        replyOkashiLiked[`${reaction.userId}:${reaction.replyId}`] = true;
+      });
+      if (currentHaiku) renderReplies(getReplies(getHaikuId(currentHaiku)));
+      renderProfilePanel();
+    }),
+    cloudDb.collection('friendships').doc(currentUserId).onSnapshot(document => {
+      friendsStore[currentUserId] = document.exists && Array.isArray(document.data().friendIds)
+        ? document.data().friendIds
+        : [];
+      renderFriendList();
+      renderProfilePanel();
+      if (currentHaiku) updateCardAuthor(currentHaiku);
+    })
+  );
+}
+
+function stopCloudSync() {
+  cloudUnsubscribers.splice(0).forEach(unsubscribe => unsubscribe());
+  cloudSyncStarted = false;
+}
+
+function deserializeCloudData(data) {
+  const result = { ...data };
+  Object.keys(result).forEach(key => {
+    if (result[key]?.toDate) result[key] = result[key].toDate().toISOString();
+  });
+  return result;
+}
+
+function serializeHaiku(h) {
+  return {
+    id: h.id,
+    name: h.name,
+    lng: h.lng,
+    lat: h.lat,
+    haiku: h.haiku,
+    author: h.author,
+    theme: h.theme,
+    category: h.category || 'nature',
+    color: h.color,
+    createdAt: h.createdAt,
+    userId: h.userId,
+  };
+}
+
+async function migrateLocalContentToCloud() {
+  if (!CLOUD_ENABLED || !currentUserId || localStorage.getItem(`haiku_go_migrated_${currentUserId}`)) return;
+  const pins = loadLocalPins();
+  if (!pins.length) {
+    localStorage.setItem(`haiku_go_migrated_${currentUserId}`, 'true');
+    return;
+  }
+  const user = getCurrentUser();
+  const batch = cloudDb.batch();
+  pins.forEach(pin => {
+    pin.id = pin.id || createHaikuId();
+    pin.userId = currentUserId;
+    pin.author = `— ${user.displayName}`;
+    batch.set(cloudDb.collection('haikus').doc(pin.id), serializeHaiku(pin));
+  });
+  await batch.commit();
+  localStorage.setItem(`haiku_go_migrated_${currentUserId}`, 'true');
 }
 
 function getHaikuId(h) {
