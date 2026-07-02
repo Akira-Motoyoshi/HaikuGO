@@ -1,0 +1,3160 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>俳句GO — 場所が俳句になる地図</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore-compat.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;600&family=Shippori+Mincho:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    body {
+      font-family: 'Noto Serif JP', serif;
+      background: #0a0a0f;
+      color: #e8e0d0;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #map {
+      width: 100vw;
+      height: 100vh;
+      position: absolute;
+      top: 0; left: 0;
+    }
+
+    #ui {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    #header {
+      pointer-events: all;
+      padding: 22px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(to bottom, rgba(10,10,15,0.88) 0%, transparent 100%);
+    }
+
+    .logo-main {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: 0.18em;
+      color: #e8d9a0;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: #7a7060;
+      margin-top: 3px;
+    }
+
+    .header-desc {
+      font-size: 11px;
+      color: #5a5448;
+      letter-spacing: 0.2em;
+      text-align: right;
+      line-height: 1.9;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    #account-button {
+      display: none;
+      align-items: center;
+      gap: 9px;
+      min-height: 40px;
+      border: 1px solid rgba(232, 217, 160, 0.24);
+      border-radius: 999px;
+      background: rgba(10, 9, 16, 0.72);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      padding: 5px 13px 5px 6px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+
+    #account-button.visible { display: flex; }
+
+    .user-icon {
+      display: inline-grid;
+      place-items: center;
+      width: 30px;
+      height: 30px;
+      flex: 0 0 30px;
+      border-radius: 50%;
+      background: rgba(232, 217, 160, 0.12);
+      border: 1px solid rgba(232, 217, 160, 0.22);
+      font-size: 16px;
+      overflow: hidden;
+    }
+
+    .user-icon img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    #account-name {
+      max-width: 120px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+    }
+
+    #auth-gate {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: grid;
+      place-items: center;
+      pointer-events: all;
+      padding: 20px;
+      background:
+        radial-gradient(circle at 50% 28%, rgba(144, 196, 232, 0.12), transparent 34%),
+        rgba(7, 7, 12, 0.96);
+      backdrop-filter: blur(12px);
+    }
+
+    #auth-gate.hidden { display: none; }
+
+    .auth-panel {
+      width: min(420px, 100%);
+      border: 1px solid rgba(232, 217, 160, 0.2);
+      background: rgba(12, 11, 18, 0.96);
+      padding: 32px;
+    }
+
+    .auth-brand {
+      color: #e8d9a0;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 26px;
+      letter-spacing: 0.2em;
+      margin-bottom: 8px;
+    }
+
+    .auth-copy {
+      color: #6a6458;
+      font-size: 11px;
+      letter-spacing: 0.13em;
+      line-height: 1.8;
+      margin-bottom: 22px;
+    }
+
+    .auth-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-bottom: 18px;
+    }
+
+    .auth-tab {
+      min-height: 38px;
+      border: 0;
+      border-bottom: 1px solid rgba(232, 217, 160, 0.14);
+      background: transparent;
+      color: #5a5448;
+      font-family: 'Noto Serif JP', serif;
+      letter-spacing: 0.2em;
+      cursor: pointer;
+    }
+
+    .auth-tab.active {
+      color: #e8d9a0;
+      border-bottom-color: rgba(232, 217, 160, 0.58);
+    }
+
+    .auth-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .auth-field,
+    .profile-field {
+      display: grid;
+      gap: 6px;
+      color: #7a7060;
+      font-size: 10px;
+      letter-spacing: 0.2em;
+    }
+
+    .auth-field input,
+    .profile-field input,
+    .profile-field select,
+    .profile-field textarea {
+      width: 100%;
+      border: 1px solid rgba(232, 217, 160, 0.16);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.25);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 13px;
+      padding: 10px;
+      outline: none;
+    }
+
+    .profile-field textarea {
+      min-height: 86px;
+      resize: vertical;
+      line-height: 1.7;
+    }
+
+    .auth-submit,
+    .profile-save {
+      min-height: 42px;
+      border: 1px solid rgba(232, 217, 160, 0.34);
+      border-radius: 2px;
+      background: rgba(232, 217, 160, 0.1);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      cursor: pointer;
+    }
+
+    .auth-secondary {
+      border: 0;
+      background: transparent;
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      text-align: left;
+      cursor: pointer;
+    }
+
+    #auth-message,
+    #profile-message {
+      min-height: 18px;
+      color: #e8a0a0;
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      line-height: 1.7;
+    }
+
+    #profile-panel {
+      position: absolute;
+      top: 82px;
+      right: 28px;
+      z-index: 40;
+      width: min(370px, calc(100vw - 40px));
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(-8px);
+      border: 1px solid rgba(232, 217, 160, 0.2);
+      background: rgba(10, 9, 16, 0.96);
+      padding: 22px;
+      backdrop-filter: blur(16px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+
+    #profile-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .profile-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 16px;
+    }
+
+    .profile-title {
+      color: #e8d9a0;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 18px;
+      letter-spacing: 0.18em;
+    }
+
+    .profile-close,
+    .logout-button,
+    .friend-remove {
+      border: 0;
+      background: transparent;
+      color: #6a6458;
+      font-family: 'Noto Serif JP', serif;
+      cursor: pointer;
+    }
+
+    .profile-preview {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .profile-preview .user-icon {
+      width: 48px;
+      height: 48px;
+      flex-basis: 48px;
+      font-size: 24px;
+    }
+
+    .profile-stats {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+      margin: 16px 0;
+    }
+
+    .profile-stat {
+      padding: 10px 6px;
+      border: 1px solid rgba(232, 217, 160, 0.12);
+      text-align: center;
+    }
+
+    .profile-stat strong {
+      display: block;
+      color: #e8d9a0;
+      font-size: 18px;
+      font-weight: 400;
+      margin-bottom: 3px;
+    }
+
+    .profile-stat span {
+      color: #5a5448;
+      font-size: 8px;
+      letter-spacing: 0.12em;
+    }
+
+    .profile-form {
+      display: grid;
+      gap: 12px;
+    }
+
+    .friends-heading {
+      color: #7a7060;
+      font-size: 10px;
+      letter-spacing: 0.24em;
+      margin: 22px 0 9px;
+    }
+
+    .friend-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .friend-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px;
+      background: rgba(232, 217, 160, 0.04);
+    }
+
+    .friend-info {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .friend-name {
+      color: #d8d0be;
+      font-size: 11px;
+      letter-spacing: 0.1em;
+    }
+
+    .friend-bio {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      color: #524e45;
+      font-size: 9px;
+      margin-top: 3px;
+    }
+
+    .friend-empty {
+      color: #4a4538;
+      font-size: 10px;
+      line-height: 1.7;
+    }
+
+    .logout-button {
+      width: 100%;
+      margin-top: 18px;
+      padding-top: 14px;
+      border-top: 1px solid rgba(232, 217, 160, 0.1);
+      font-size: 10px;
+      letter-spacing: 0.2em;
+    }
+
+    .icon-upload-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+    }
+
+    #profile-icon-file {
+      font-size: 10px;
+      color: #7a7060;
+    }
+
+    #profile-icon-file::file-selector-button,
+    #remove-icon-image {
+      min-height: 34px;
+      border: 1px solid rgba(232, 217, 160, 0.22);
+      border-radius: 2px;
+      background: rgba(232, 217, 160, 0.06);
+      color: #d8d0be;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      padding: 0 10px;
+      cursor: pointer;
+    }
+
+    #remove-icon-image {
+      white-space: nowrap;
+    }
+
+    .icon-note {
+      color: #4a4538;
+      font-size: 9px;
+      letter-spacing: 0.08em;
+      line-height: 1.6;
+    }
+
+    .delete-haiku-button {
+      min-height: 28px;
+      border: 1px solid rgba(232, 160, 160, 0.24);
+      border-radius: 999px;
+      background: rgba(232, 160, 160, 0.05);
+      color: #b87878;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+      padding: 4px 11px;
+      cursor: pointer;
+    }
+
+    #ranking-toggle {
+      position: absolute;
+      top: 154px;
+      left: 136px;
+      pointer-events: all;
+      min-height: 38px;
+      border: 1px solid rgba(144, 196, 232, 0.28);
+      border-radius: 2px;
+      background: rgba(10, 9, 16, 0.78);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 0 14px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+
+    #ranking-toggle.active {
+      background: rgba(10, 9, 16, 0.95);
+      border-color: rgba(144, 196, 232, 0.5);
+    }
+
+    #ranking-panel {
+      position: absolute;
+      top: 204px;
+      left: 28px;
+      z-index: 35;
+      width: min(390px, calc(100vw - 56px));
+      max-height: calc(100vh - 244px);
+      overflow-y: auto;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(8px);
+      border: 1px solid rgba(144, 196, 232, 0.18);
+      background: rgba(10, 9, 16, 0.94);
+      padding: 20px;
+      backdrop-filter: blur(16px);
+      transition: opacity 0.25s, transform 0.25s;
+    }
+
+    #ranking-panel.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .ranking-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+    }
+
+    .ranking-title {
+      color: #e8d9a0;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 17px;
+      letter-spacing: 0.18em;
+    }
+
+    .ranking-close {
+      border: 0;
+      background: transparent;
+      color: #6a6458;
+      cursor: pointer;
+    }
+
+    .ranking-tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-bottom: 14px;
+    }
+
+    .ranking-tab {
+      min-height: 36px;
+      border: 0;
+      border-bottom: 1px solid rgba(144, 196, 232, 0.14);
+      background: transparent;
+      color: #5a6070;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      cursor: pointer;
+    }
+
+    .ranking-tab.active {
+      color: #90c4e8;
+      border-bottom-color: rgba(144, 196, 232, 0.58);
+    }
+
+    .ranking-note {
+      color: #4a535d;
+      font-size: 9px;
+      letter-spacing: 0.1em;
+      margin-bottom: 12px;
+    }
+
+    .ranking-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .ranking-item {
+      display: grid;
+      grid-template-columns: 28px 1fr auto;
+      gap: 9px;
+      align-items: center;
+      width: 100%;
+      border: 1px solid rgba(232, 217, 160, 0.1);
+      background: rgba(232, 217, 160, 0.03);
+      color: inherit;
+      text-align: left;
+      padding: 10px;
+      cursor: pointer;
+    }
+
+    .ranking-position {
+      color: #90c4e8;
+      font-size: 15px;
+      text-align: center;
+    }
+
+    .ranking-haiku {
+      display: block;
+      color: #d8d0be;
+      font-size: 11px;
+      line-height: 1.6;
+    }
+
+    .ranking-author {
+      display: block;
+      color: #565147;
+      font-size: 8px;
+      margin-top: 3px;
+    }
+
+    .ranking-score {
+      color: #e8d9a0;
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .ranking-empty {
+      color: #4a4538;
+      font-size: 10px;
+      line-height: 1.8;
+      padding: 16px 4px;
+    }
+
+    #legend {
+      position: absolute;
+      top: 90px;
+      right: 28px;
+      pointer-events: all;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: #5a5448;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    #hint {
+      position: absolute;
+      bottom: 48px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 11px;
+      letter-spacing: 0.35em;
+      color: #4a4538;
+      white-space: nowrap;
+      transition: opacity 0.5s;
+    }
+    #hint.hidden { opacity: 0; }
+
+    #card {
+      position: absolute;
+      bottom: 40px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      width: min(460px, 90vw);
+      background: rgba(10, 9, 16, 0.92);
+      border: 1px solid rgba(232, 217, 160, 0.18);
+      border-radius: 2px;
+      padding: 28px 32px 24px;
+      backdrop-filter: blur(14px);
+      opacity: 0;
+      transition: opacity 0.45s ease, transform 0.45s ease;
+      pointer-events: none;
+      height: min(440px, calc(100vh - 80px));
+      max-height: calc(100vh - 80px);
+      overflow-y: auto;
+      scrollbar-color: rgba(232, 217, 160, 0.28) transparent;
+    }
+
+    #card.visible {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: all;
+    }
+
+    .card-location {
+      font-size: 10px;
+      letter-spacing: 0.42em;
+      color: #7a7060;
+      margin-bottom: 16px;
+      text-transform: uppercase;
+    }
+
+    .card-haiku {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 21px;
+      line-height: 2.3;
+      color: #e8d9a0;
+      letter-spacing: 0.12em;
+      border-left: 2px solid rgba(232, 217, 160, 0.35);
+      padding-left: 18px;
+      margin-bottom: 20px;
+    }
+
+    .card-author {
+      font-size: 11px;
+      color: #5a5448;
+      letter-spacing: 0.32em;
+    }
+
+    .card-author-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .card-author-row .user-icon {
+      width: 28px;
+      height: 28px;
+      flex-basis: 28px;
+      font-size: 14px;
+    }
+
+    #friend-button {
+      margin-left: auto;
+      min-height: 28px;
+      border: 1px solid rgba(144, 196, 232, 0.28);
+      border-radius: 999px;
+      background: rgba(144, 196, 232, 0.06);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.13em;
+      padding: 4px 11px;
+      cursor: pointer;
+    }
+
+    #friend-button.added {
+      color: #7a7060;
+      border-color: rgba(232, 217, 160, 0.18);
+      background: rgba(232, 217, 160, 0.04);
+    }
+
+    .card-theme {
+      display: inline-block;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: #e8d9a0;
+      border: 1px solid rgba(232, 217, 160, 0.28);
+      padding: 4px 14px;
+    }
+
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .okashi-button {
+      min-height: 28px;
+      border: 1px solid rgba(232, 217, 160, 0.24);
+      border-radius: 999px;
+      background: rgba(232, 217, 160, 0.06);
+      color: #7a7060;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 4px 13px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s, background 0.2s;
+    }
+
+    .okashi-button:hover,
+    .okashi-button.liked {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.48);
+      background: rgba(232, 217, 160, 0.12);
+    }
+
+    .card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .reply-summary {
+      color: #90c4e8;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 4px 2px;
+      white-space: nowrap;
+    }
+
+    #reply-area {
+      display: block;
+      margin-top: 18px;
+      padding-top: 22px;
+      border-top: 1px solid rgba(232, 217, 160, 0.12);
+    }
+
+    .reply-heading {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 10px;
+      letter-spacing: 0.3em;
+      color: #7a7060;
+      margin-bottom: 12px;
+    }
+
+    .reply-order {
+      color: #4a6070;
+      letter-spacing: 0.14em;
+    }
+
+    .reply-list {
+      display: grid;
+      gap: 11px;
+      margin-bottom: 14px;
+    }
+
+    .reply-item {
+      padding: 11px 13px;
+      border-left: 1px solid rgba(144, 196, 232, 0.42);
+      background: rgba(144, 196, 232, 0.04);
+    }
+
+    .reply-haiku {
+      color: #d8d7c9;
+      font-family: 'Shippori Mincho', serif;
+      font-size: 14px;
+      line-height: 1.8;
+      letter-spacing: 0.1em;
+    }
+
+    .reply-author {
+      color: #5a5448;
+      font-size: 9px;
+      letter-spacing: 0.22em;
+    }
+
+    .reply-item-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .reply-okashi-button {
+      min-height: 25px;
+      border: 1px solid rgba(232, 217, 160, 0.2);
+      border-radius: 999px;
+      background: rgba(232, 217, 160, 0.04);
+      color: #6a6456;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      padding: 3px 10px;
+      cursor: pointer;
+    }
+
+    .reply-okashi-button:hover,
+    .reply-okashi-button.liked {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.44);
+      background: rgba(232, 217, 160, 0.1);
+    }
+
+    .reply-empty {
+      color: #4a4538;
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      margin-bottom: 14px;
+    }
+
+    .reply-form {
+      display: grid;
+      gap: 8px;
+    }
+
+    .reply-lines {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 7px;
+    }
+
+    .reply-form input {
+      width: 100%;
+      min-width: 0;
+      min-height: 34px;
+      border: 1px solid rgba(144, 196, 232, 0.2);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.22);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 12px;
+      padding: 8px 9px;
+      outline: none;
+    }
+
+    .reply-form input:focus {
+      border-color: rgba(144, 196, 232, 0.52);
+    }
+
+    .reply-form input::placeholder { color: #4a4538; }
+
+    .reply-footer {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .reply-submit {
+      border: 1px solid rgba(144, 196, 232, 0.34);
+      border-radius: 2px;
+      background: rgba(144, 196, 232, 0.09);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 0 14px;
+      cursor: pointer;
+    }
+
+    #reply-message {
+      min-height: 16px;
+      color: #7a7060;
+      font-size: 9px;
+      letter-spacing: 0.12em;
+    }
+
+    #reply-message.warn { color: #e8a0a0; }
+
+    .card-close {
+      position: absolute;
+      top: 14px; right: 18px;
+      background: none;
+      border: none;
+      color: #5a5448;
+      font-size: 18px;
+      cursor: pointer;
+      transition: color 0.2s;
+      pointer-events: all;
+    }
+    .card-close:hover { color: #e8d9a0; }
+
+    .mapboxgl-ctrl-bottom-left,
+    .mapboxgl-ctrl-bottom-right { opacity: 0.4; }
+    .mapboxgl-ctrl-top-right { display: none; }
+
+    .haiku-marker {
+      cursor: pointer;
+      width: 30px;
+      height: 30px;
+    }
+
+    .draft-marker {
+      pointer-events: none;
+      filter: drop-shadow(0 0 10px rgba(232, 217, 160, 0.55));
+    }
+
+    #compose-toggle {
+      position: absolute;
+      top: 154px;
+      left: 28px;
+      pointer-events: all;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 11px;
+      letter-spacing: 0.3em;
+      color: #e8d9a0;
+      background: rgba(10, 9, 16, 0.78);
+      border: 1px solid rgba(232, 217, 160, 0.26);
+      border-radius: 2px;
+      padding: 10px 16px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    #compose-toggle:hover,
+    #compose-toggle.active {
+      background: rgba(10, 9, 16, 0.94);
+      border-color: rgba(232, 217, 160, 0.48);
+    }
+
+    #compose {
+      position: absolute;
+      top: 204px;
+      left: 28px;
+      width: min(368px, calc(100vw - 56px));
+      max-height: calc(100vh - 244px);
+      overflow: auto;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(10px);
+      background: rgba(10, 9, 16, 0.92);
+      border: 1px solid rgba(232, 217, 160, 0.18);
+      border-radius: 2px;
+      padding: 22px 22px 20px;
+      backdrop-filter: blur(14px);
+      transition: opacity 0.35s ease, transform 0.35s ease;
+    }
+
+    #compose.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: all;
+    }
+
+    .compose-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .compose-title {
+      font-family: 'Shippori Mincho', serif;
+      font-size: 18px;
+      letter-spacing: 0.22em;
+      color: #e8d9a0;
+    }
+
+    .compose-close {
+      background: none;
+      border: none;
+      color: #5a5448;
+      font-size: 18px;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+
+    .compose-close:hover { color: #e8d9a0; }
+
+    .compose-field {
+      display: block;
+      margin-bottom: 13px;
+    }
+
+    .compose-field span,
+    .category-field legend {
+      display: block;
+      font-size: 10px;
+      letter-spacing: 0.28em;
+      color: #7a7060;
+      margin-bottom: 7px;
+    }
+
+    .compose-field input,
+    .compose-field textarea {
+      width: 100%;
+      min-height: 36px;
+      border: 1px solid rgba(232, 217, 160, 0.16);
+      border-radius: 2px;
+      background: rgba(0, 0, 0, 0.22);
+      color: #e8d9a0;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 13px;
+      letter-spacing: 0.08em;
+      padding: 9px 10px;
+      outline: none;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .compose-field input:focus,
+    .compose-field textarea:focus {
+      background: rgba(0, 0, 0, 0.34);
+      border-color: rgba(232, 217, 160, 0.42);
+    }
+
+    .compose-field input::placeholder,
+    .compose-field textarea::placeholder { color: #4a4538; }
+
+    .haiku-lines {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+
+    .haiku-lines .compose-field { margin-bottom: 0; }
+
+    #syllable-meter {
+      min-height: 17px;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      color: #4a4538;
+      margin-bottom: 14px;
+    }
+
+    #syllable-meter.good { color: #e8d9a0; }
+
+    .compose-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .category-field {
+      border: 0;
+      margin: 2px 0 15px;
+    }
+
+    .category-options {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+
+    .category-options label {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 35px;
+      border: 1px solid rgba(232, 217, 160, 0.14);
+      color: #5a5448;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .category-options input {
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .category-options .swatch {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      margin-right: 7px;
+    }
+
+    .category-options label:has(input:checked) {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.36);
+      background: rgba(232, 217, 160, 0.04);
+    }
+
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+    }
+
+    .location-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin-bottom: 15px;
+    }
+
+    .location-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    #pick-location,
+    #current-location,
+    #search-location,
+    .compose-submit {
+      font-family: 'Noto Serif JP', serif;
+      border-radius: 2px;
+      cursor: pointer;
+    }
+
+    #pick-location,
+    #current-location,
+    #search-location {
+      min-height: 36px;
+      border: 1px solid rgba(144, 196, 232, 0.34);
+      background: rgba(144, 196, 232, 0.07);
+      color: #90c4e8;
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      padding: 0 12px;
+    }
+
+    #search-location {
+      color: #e8d9a0;
+      border-color: rgba(232, 217, 160, 0.28);
+      background: rgba(232, 217, 160, 0.07);
+      white-space: nowrap;
+    }
+
+    #pick-location.active {
+      border-color: rgba(232, 217, 160, 0.58);
+      color: #e8d9a0;
+      background: rgba(232, 217, 160, 0.08);
+    }
+
+    #compose-coords {
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      line-height: 1.7;
+      color: #4a4538;
+      min-width: 0;
+      word-break: break-all;
+    }
+
+    #compose-message {
+      min-height: 18px;
+      color: #7a7060;
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      line-height: 1.7;
+      margin-bottom: 12px;
+    }
+
+    #compose-message.warn { color: #e8a0a0; }
+
+    .compose-submit {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid rgba(232, 217, 160, 0.35);
+      background: rgba(232, 217, 160, 0.1);
+      color: #e8d9a0;
+      font-size: 11px;
+      letter-spacing: 0.34em;
+    }
+
+    .compose-submit:hover {
+      background: rgba(232, 217, 160, 0.16);
+      border-color: rgba(232, 217, 160, 0.56);
+    }
+
+    body.picking-location #map { cursor: crosshair; }
+
+    @media (max-width: 720px) {
+      #header {
+        padding: 18px 20px;
+        align-items: flex-start;
+      }
+
+      .logo-main { font-size: 24px; }
+      .header-desc { display: none; }
+      .header-right { gap: 8px; }
+      #account-name { display: none; }
+      #account-button { padding-right: 6px; }
+
+      #profile-panel {
+        top: 76px;
+        right: 20px;
+        max-height: calc(100vh - 96px);
+      }
+
+      #legend {
+        top: 86px;
+        right: 20px;
+        gap: 8px;
+      }
+
+      #compose-toggle {
+        top: 88px;
+        left: 20px;
+      }
+
+      #ranking-toggle {
+        top: 88px;
+        left: 126px;
+      }
+
+      #ranking-panel {
+        top: 138px;
+        left: 20px;
+        width: calc(100vw - 40px);
+        max-height: calc(100vh - 190px);
+      }
+
+      #compose {
+        top: 138px;
+        left: 20px;
+        width: calc(100vw - 40px);
+        max-height: calc(100vh - 190px);
+      }
+
+      .haiku-lines,
+      .compose-grid,
+      .location-actions,
+      .search-row {
+        grid-template-columns: 1fr;
+      }
+
+      #card {
+        bottom: 26px;
+        padding: 26px 24px 22px;
+        height: min(440px, calc(100vh - 52px));
+        max-height: calc(100vh - 52px);
+      }
+
+      .reply-lines,
+      .reply-footer { grid-template-columns: 1fr; }
+
+      .reply-submit { min-height: 34px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="auth-gate">
+  <div class="auth-panel">
+    <div class="auth-brand">俳句GO</div>
+    <div class="auth-copy">ことばと場所を、あなたの名前で結ぶ。<br>アカウントを作成するか、ログインしてください。</div>
+    <div class="auth-tabs" role="tablist" aria-label="アカウント">
+      <button class="auth-tab active" id="login-tab" type="button" role="tab" aria-selected="true">ログイン</button>
+      <button class="auth-tab" id="signup-tab" type="button" role="tab" aria-selected="false">新規登録</button>
+    </div>
+    <form class="auth-form" id="auth-form">
+      <label class="auth-field" id="signup-name-field" hidden>
+        アカウントの名前
+        <input id="auth-display-name" type="text" autocomplete="name" maxlength="24">
+      </label>
+      <label class="auth-field">
+        メールアドレス
+        <input id="auth-username" type="email" autocomplete="email" maxlength="120" required>
+      </label>
+      <label class="auth-field">
+        パスワード
+        <input id="auth-password" type="password" autocomplete="current-password" minlength="6" required>
+      </label>
+      <div id="auth-message" aria-live="polite"></div>
+      <button class="auth-secondary" id="forgot-password" type="button">パスワードを忘れた場合</button>
+      <button class="auth-submit" id="auth-submit" type="submit">ログイン</button>
+    </form>
+  </div>
+</div>
+
+<div id="ui">
+  <div id="header">
+    <div>
+      <div class="logo-main">俳句GO</div>
+      <div class="logo-sub">HAIKU × PLACE</div>
+    </div>
+    <div class="header-right">
+      <div class="header-desc">
+        場所が俳句になる。<br>
+        ピンをクリックして、その土地の言葉を読む。
+      </div>
+      <button id="account-button" type="button" aria-expanded="false" aria-controls="profile-panel">
+        <span class="user-icon" id="account-icon">🌿</span>
+        <span id="account-name"></span>
+      </button>
+    </div>
+  </div>
+
+  <aside id="profile-panel" aria-label="プロフィール">
+    <div class="profile-head">
+      <div class="profile-title">わたしの帳面</div>
+      <button class="profile-close" type="button" aria-label="プロフィールを閉じる">✕</button>
+    </div>
+    <div class="profile-preview">
+      <span class="user-icon" id="profile-preview-icon">🌿</span>
+      <div>
+        <div class="friend-name" id="profile-preview-name"></div>
+        <div class="friend-bio" id="profile-username"></div>
+      </div>
+    </div>
+    <div class="profile-stats">
+      <div class="profile-stat"><strong id="profile-okashi">0</strong><span>獲得をかし</span></div>
+      <div class="profile-stat"><strong id="profile-haiku-count">0</strong><span>投稿した句</span></div>
+      <div class="profile-stat"><strong id="profile-friend-count">0</strong><span>俳友</span></div>
+    </div>
+    <form class="profile-form" id="profile-form">
+      <label class="profile-field">
+        アカウントの名前
+        <input id="profile-name" type="text" maxlength="24" required>
+      </label>
+      <label class="profile-field">
+        アイコン画像
+        <div class="icon-upload-row">
+          <input id="profile-icon-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+          <button id="remove-icon-image" type="button">画像を外す</button>
+        </div>
+        <span class="icon-note">PNG・JPEG・WebP・GIF、2MBまで</span>
+      </label>
+      <label class="profile-field">
+        bio
+        <textarea id="profile-bio" maxlength="160" placeholder="好きな季語や、詠みたい風景など"></textarea>
+      </label>
+      <div id="profile-message" aria-live="polite"></div>
+      <button class="profile-save" type="submit">プロフィールを保存</button>
+    </form>
+    <div class="friends-heading">俳友</div>
+    <div class="friend-list" id="friend-list"></div>
+    <button class="logout-button" id="logout-button" type="button">ログアウト</button>
+  </aside>
+
+  <div id="legend">
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#e8d9a0;"></div>
+      <span>自然・景色</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#90c4e8;"></div>
+      <span>水・海・川</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-dot" style="background:#e8a0a0;"></div>
+      <span>都市・人</span>
+    </div>
+  </div>
+
+  <button id="compose-toggle" type="button" aria-expanded="false" aria-controls="compose">＋ 詠む</button>
+  <button id="ranking-toggle" type="button" aria-expanded="false" aria-controls="ranking-panel">ランキング</button>
+
+  <section id="ranking-panel" aria-label="をかしランキング">
+    <div class="ranking-head">
+      <div class="ranking-title">をかしランキング</div>
+      <button class="ranking-close" type="button" aria-label="ランキングを閉じる">✕</button>
+    </div>
+    <div class="ranking-tabs" role="tablist" aria-label="ランキング期間">
+      <button class="ranking-tab active" id="weekly-ranking-tab" type="button" role="tab" aria-selected="true">週間</button>
+      <button class="ranking-tab" id="monthly-ranking-tab" type="button" role="tab" aria-selected="false">月間</button>
+    </div>
+    <div class="ranking-note" id="ranking-note">直近7日間に得た「をかし」</div>
+    <div class="ranking-list" id="ranking-list"></div>
+  </section>
+
+  <form id="compose" aria-label="俳句投稿フォーム">
+    <div class="compose-head">
+      <div class="compose-title">一句を置く</div>
+      <button class="compose-close" type="button" aria-label="閉じる">✕</button>
+    </div>
+
+    <label class="compose-field">
+      <span>地名</span>
+      <input id="compose-name" type="text" placeholder="隅田川 / 東京都" required>
+    </label>
+
+    <div class="haiku-lines">
+      <label class="compose-field">
+        <span>上五</span>
+        <input id="compose-line-1" type="text" required>
+      </label>
+      <label class="compose-field">
+        <span>中七</span>
+        <input id="compose-line-2" type="text" required>
+      </label>
+      <label class="compose-field">
+        <span>下五</span>
+        <input id="compose-line-3" type="text" required>
+      </label>
+    </div>
+
+    <div id="syllable-meter">0 / 0 / 0</div>
+
+    <div class="compose-grid">
+      <label class="compose-field">
+        <span>作者</span>
+        <input id="compose-author" type="text" placeholder="無名">
+      </label>
+      <label class="compose-field">
+        <span>季・題</span>
+        <input id="compose-theme" type="text" placeholder="春・川" required>
+      </label>
+    </div>
+
+    <fieldset class="category-field">
+      <legend>カテゴリ</legend>
+      <div class="category-options">
+        <label>
+          <input type="radio" name="compose-category" value="nature" data-color="#e8d9a0" checked>
+          <span class="swatch" style="background:#e8d9a0;"></span>自然
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="water" data-color="#90c4e8">
+          <span class="swatch" style="background:#90c4e8;"></span>水辺
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="urban" data-color="#e8a0a0">
+          <span class="swatch" style="background:#e8a0a0;"></span>都市
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="life" data-color="#e8a0a0">
+          <span class="swatch" style="background:#e8a0a0;"></span>生活
+        </label>
+        <label>
+          <input type="radio" name="compose-category" value="leisure" data-color="#e8d9a0">
+          <span class="swatch" style="background:#e8d9a0;"></span>娯楽
+        </label>
+      </div>
+    </fieldset>
+
+    <div class="compose-field">
+      <span>場所検索</span>
+      <div class="search-row">
+        <input id="place-search" type="text" placeholder="例：鎌倉市、隅田川、銀座">
+        <button id="search-location" type="button">検索</button>
+      </div>
+    </div>
+
+    <div class="location-row">
+      <div class="location-actions">
+        <button id="pick-location" type="button">地図で選ぶ</button>
+        <button id="current-location" type="button">現在地で詠む</button>
+      </div>
+      <div id="compose-coords">座標未選択</div>
+    </div>
+
+    <div id="compose-message" aria-live="polite"></div>
+    <button class="compose-submit" type="submit">ピンを立てる</button>
+  </form>
+
+  <div id="hint">ピンをクリックすると俳句が読めます</div>
+
+  <div id="card">
+    <button class="card-close" onclick="closeCard()">✕</button>
+    <div class="card-location" id="card-location"></div>
+    <div class="card-haiku" id="card-haiku"></div>
+    <div class="card-author-row">
+      <span class="user-icon" id="card-author-icon">✒️</span>
+      <div class="card-author" id="card-author"></div>
+      <button id="friend-button" type="button">俳友に追加</button>
+    </div>
+    <div class="card-meta-row">
+      <div class="card-theme" id="card-theme"></div>
+      <div class="card-actions">
+        <div class="reply-summary" id="reply-summary">↓ 返句 <span id="reply-count">0</span></div>
+        <button class="delete-haiku-button" id="delete-haiku-button" type="button">削除</button>
+        <button class="okashi-button" id="okashi-button" type="button" aria-pressed="false">
+          をかし <span id="okashi-count">0</span>
+        </button>
+      </div>
+    </div>
+    <section id="reply-area" aria-label="返句">
+      <div class="reply-heading">
+        <span>この句への返句</span>
+        <span class="reply-order">をかし順</span>
+      </div>
+      <div class="reply-list" id="reply-list"></div>
+      <form class="reply-form" id="reply-form">
+        <div class="reply-lines">
+          <input id="reply-line-1" type="text" placeholder="上五" aria-label="返句の上五" required>
+          <input id="reply-line-2" type="text" placeholder="中七" aria-label="返句の中七" required>
+          <input id="reply-line-3" type="text" placeholder="下五" aria-label="返句の下五" required>
+        </div>
+        <div class="reply-footer">
+          <input id="reply-author" type="text" placeholder="作者（無名）" aria-label="返句の作者">
+          <button class="reply-submit" type="submit">返句を置く</button>
+        </div>
+        <div id="reply-message" aria-live="polite"></div>
+      </form>
+    </section>
+  </div>
+</div>
+</div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiYWtpLWFvZ2FrdSIsImEiOiJjbXA5cW0zaHcwbGZkMnBvZ2RleTM5b2sxIn0.7Gj-P35EuhV7W7iMhN6Plw';
+
+const firebaseConfig = {
+  apiKey: 'AIzaSyBFBhWEUOoi3LA2EEQezWVH9q4DgFm5EnI',
+  authDomain: 'haikugo-bacbb.firebaseapp.com',
+  projectId: 'haikugo-bacbb',
+  storageBucket: 'haikugo-bacbb.firebasestorage.app',
+  messagingSenderId: '340008511163',
+  appId: '1:340008511163:web:3df67ebc10131903716b9e',
+};
+const CLOUD_ENABLED = Boolean(window.firebase);
+if (CLOUD_ENABLED && !firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const cloudAuth = CLOUD_ENABLED ? firebase.auth() : null;
+const cloudDb = CLOUD_ENABLED ? firebase.firestore() : null;
+
+const STORAGE_KEY = 'haiku_go_local_pins_v1';
+const OKASHI_STORAGE_KEY = 'haiku_go_okashi_counts_v1';
+const OKASHI_LIKED_KEY = 'haiku_go_okashi_liked_v1';
+const OKASHI_EVENTS_KEY = 'haiku_go_okashi_events_v1';
+const REPLY_STORAGE_KEY = 'haiku_go_replies_v1';
+const REPLY_OKASHI_STORAGE_KEY = 'haiku_go_reply_okashi_counts_v1';
+const REPLY_OKASHI_LIKED_KEY = 'haiku_go_reply_okashi_liked_v1';
+let replyStore = readJson(REPLY_STORAGE_KEY, {});
+let replyOkashiCounts = readJson(REPLY_OKASHI_STORAGE_KEY, {});
+let replyOkashiLiked = readJson(REPLY_OKASHI_LIKED_KEY, {});
+const CATEGORY_OPTIONS = {
+  nature: { label: '自然', color: '#e8d9a0' },
+  water: { label: '水辺', color: '#90c4e8' },
+  urban: { label: '都市', color: '#e8a0a0' },
+  life: { label: '生活', color: '#e8a0a0' },
+  leisure: { label: '娯楽', color: '#e8d9a0' },
+};
+const PIN_COLORS = [...new Set(Object.values(CATEGORY_OPTIONS).map(category => category.color))];
+const VERIFY_ONLY = new URLSearchParams(window.location.search).has('verify');
+const USERS_STORAGE_KEY = 'haiku_go_users_v1';
+const SESSION_STORAGE_KEY = 'haiku_go_session_v1';
+const FRIENDS_STORAGE_KEY = 'haiku_go_friends_v1';
+let usersStore = readJson(USERS_STORAGE_KEY, {});
+let friendsStore = readJson(FRIENDS_STORAGE_KEY, {});
+let currentUserId = VERIFY_ONLY ? null : localStorage.getItem(SESSION_STORAGE_KEY);
+let authMode = 'login';
+let okashiEvents = Array.isArray(readJson(OKASHI_EVENTS_KEY, []))
+  ? readJson(OKASHI_EVENTS_KEY, [])
+  : [];
+let pendingIconImage = null;
+let rankingPeriod = 'weekly';
+const haikuMarkers = new Map();
+const cloudUnsubscribers = [];
+const cloudHaikuIds = new Set();
+let cloudSyncStarted = false;
+
+const haikuData = [
+  // --- 既存10カ所 ---
+  { name: "松島 / 宮城県", lng: 141.0694, lat: 38.3627, haiku: "松島や\nああ松島や\n松島や", author: "— 松尾芭蕉（伝）", theme: "景・海", color: "#90c4e8" },
+  { name: "丹後 / 京都府", lng: 135.2, lat: 35.6, haiku: "春の海\nひねもすのたり\nのたりかな", author: "— 与謝蕪村", theme: "春・海", color: "#90c4e8" },
+  { name: "法隆寺 / 奈良県", lng: 135.7345, lat: 34.6147, haiku: "柿食えば\n鐘が鳴るなり\n法隆寺", author: "— 正岡子規", theme: "秋・音", color: "#e8d9a0" },
+  { name: "立石寺 / 山形県", lng: 140.4369, lat: 38.3117, haiku: "閑さや\n岩にしみ入る\n蝉の声", author: "— 松尾芭蕉", theme: "夏・静寂", color: "#e8d9a0" },
+  { name: "信濃 / 長野県", lng: 138.1812, lat: 36.6513, haiku: "やせ蛙\n負けるな一茶\nこれにあり", author: "— 小林一茶", theme: "春・生命", color: "#e8d9a0" },
+  { name: "最上川 / 山形県", lng: 140.1015, lat: 38.9144, haiku: "五月雨を\nあつめて早し\n最上川", author: "— 松尾芭蕉", theme: "夏・川", color: "#90c4e8" },
+  { name: "東京", lng: 139.6503, lat: 35.6762, haiku: "去年今年\n貫く棒の\nごときもの", author: "— 高浜虚子", theme: "新年・時", color: "#e8a0a0" },
+  { name: "萩 / 山口県", lng: 131.3993, lat: 34.4081, haiku: "分け入っても\n分け入っても\n青い山", author: "— 種田山頭火", theme: "旅・山", color: "#e8d9a0" },
+  { name: "平泉 / 岩手県", lng: 141.1139, lat: 38.9871, haiku: "夏草や\n兵どもが\n夢の跡", author: "— 松尾芭蕉", theme: "夏・無常", color: "#e8d9a0" },
+  { name: "宮島 / 広島県", lng: 132.3195, lat: 34.2952, haiku: "大鳥居\n海に浮かびて\n秋の空", author: "— 作者不詳", theme: "秋・光", color: "#e8a0a0" },
+
+  // --- 追加40カ所 ---
+  // 北海道・東北
+  { name: "函館 / 北海道", lng: 140.7290, lat: 41.7688, haiku: "春暁や\n函館山の\n霞かな", author: "— 高浜虚子", theme: "春・山", color: "#e8d9a0" },
+  { name: "釧路湿原 / 北海道", lng: 144.3747, lat: 43.0500, haiku: "丹頂鶴\n霧の湿原\n舞い上がる", author: "— 作者不詳", theme: "冬・自然", color: "#e8d9a0" },
+  { name: "小樽 / 北海道", lng: 140.9947, lat: 43.1907, haiku: "運河沿い\n雪積む倉庫\n灯りかな", author: "— 作者不詳", theme: "冬・港", color: "#90c4e8" },
+  { name: "十和田湖 / 青森県", lng: 140.8833, lat: 40.4667, haiku: "湖面青く\n奥入瀬の水\n流れけり", author: "— 作者不詳", theme: "夏・湖", color: "#90c4e8" },
+  { name: "角館 / 秋田県", lng: 140.5638, lat: 39.5920, haiku: "武家屋敷\n枝垂れ桜の\n重さかな", author: "— 作者不詳", theme: "春・花", color: "#e8d9a0" },
+  { name: "松尾芭蕉記念館 / 伊賀 / 三重県", lng: 136.1297, lat: 34.7694, haiku: "旅に病んで\n夢は枯野を\nかけめぐる", author: "— 松尾芭蕉", theme: "冬・旅", color: "#e8d9a0" },
+  { name: "仙台 / 宮城県", lng: 140.8694, lat: 38.2688, haiku: "七夕や\n空に届かぬ\n願いかな", author: "— 作者不詳", theme: "夏・祭", color: "#e8a0a0" },
+
+  // 関東
+  { name: "江ノ島 / 神奈川県", lng: 139.4797, lat: 35.2998, haiku: "波の音\n江の島かすむ\n春の海", author: "— 作者不詳", theme: "春・海", color: "#90c4e8" },
+  { name: "日光 / 栃木県", lng: 139.5983, lat: 36.7503, haiku: "あらたふと\n青葉若葉の\n日の光", author: "— 松尾芭蕉", theme: "夏・光", color: "#e8d9a0" },
+  { name: "上野 / 東京都", lng: 139.7744, lat: 35.7146, haiku: "花の雲\n鐘は上野か\n浅草か", author: "— 松尾芭蕉", theme: "春・花", color: "#e8a0a0" },
+  { name: "両国 / 東京都", lng: 139.7939, lat: 35.6966, haiku: "夕涼み\n隅田の風や\n夏衣", author: "— 作者不詳", theme: "夏・川", color: "#90c4e8" },
+  { name: "鎌倉 / 神奈川県", lng: 139.5468, lat: 35.3192, haiku: "大仏の\n膝に落ちたる\n木の葉かな", author: "— 作者不詳", theme: "秋・仏", color: "#e8d9a0" },
+  { name: "富士山 / 静岡県", lng: 138.7278, lat: 35.3606, haiku: "富士の風や\n扇にのせて\n江戸土産", author: "— 松尾芭蕉", theme: "夏・山", color: "#e8d9a0" },
+  { name: "箱根 / 神奈川県", lng: 139.0224, lat: 35.2328, haiku: "霧の中\n芦ノ湖静か\n秋深し", author: "— 作者不詳", theme: "秋・湖", color: "#90c4e8" },
+
+  // 中部・北陸
+  { name: "金沢 / 石川県", lng: 136.6256, lat: 36.5613, haiku: "兼六園\n雪吊りの松\n冬構え", author: "— 作者不詳", theme: "冬・庭", color: "#e8d9a0" },
+  { name: "永平寺 / 福井県", lng: 136.4980, lat: 36.0913, haiku: "杉古木\n苔むす参道\n梅雨しずく", author: "— 作者不詳", theme: "夏・寺", color: "#e8d9a0" },
+  { name: "白川郷 / 岐阜県", lng: 136.9021, lat: 36.2572, haiku: "合掌造り\n雪に埋もれて\n煙立つ", author: "— 作者不詳", theme: "冬・里", color: "#e8a0a0" },
+  { name: "諏訪湖 / 長野県", lng: 138.0746, lat: 36.0362, haiku: "諏訪の海\n御神渡りや\n冬深し", author: "— 作者不詳", theme: "冬・湖", color: "#90c4e8" },
+  { name: "伊勢神宮 / 三重県", lng: 136.7057, lat: 34.4553, haiku: "何事の\nおはしますかは\n知らねども", author: "— 松尾芭蕉", theme: "秋・神", color: "#e8d9a0" },
+  { name: "浜名湖 / 静岡県", lng: 137.6167, lat: 34.7167, haiku: "浜名湖や\n春風渡る\n鰻舟", author: "— 作者不詳", theme: "春・湖", color: "#90c4e8" },
+
+  // 近畿
+  { name: "嵐山 / 京都府", lng: 135.6720, lat: 35.0095, haiku: "嵐山\n紅葉の錦\n川に散る", author: "— 作者不詳", theme: "秋・紅葉", color: "#e8d9a0" },
+  { name: "祇園 / 京都府", lng: 135.7755, lat: 35.0035, haiku: "祇園会や\n灯りの海に\n鉾浮かぶ", author: "— 作者不詳", theme: "夏・祭", color: "#e8a0a0" },
+  { name: "奈良 / 奈良県", lng: 135.8328, lat: 34.6851, haiku: "春日野の\n若草山に\n鹿遊ぶ", author: "— 作者不詳", theme: "春・鹿", color: "#e8d9a0" },
+  { name: "大阪 / 大阪府", lng: 135.5023, lat: 34.6937, haiku: "大阪や\n食い倒れの街\n春の宵", author: "— 作者不詳", theme: "春・都", color: "#e8a0a0" },
+  { name: "姫路城 / 兵庫県", lng: 134.6939, lat: 34.8394, haiku: "白鷺城\n桜に映えて\n春霞", author: "— 作者不詳", theme: "春・城", color: "#e8d9a0" },
+  { name: "天橋立 / 京都府", lng: 135.1797, lat: 35.5497, haiku: "股のぞき\n逆さに見れば\n海の橋", author: "— 作者不詳", theme: "夏・景", color: "#90c4e8" },
+  { name: "琵琶湖 / 滋賀県", lng: 136.1667, lat: 35.3000, haiku: "湖の\n水鳥しずか\n春の朝", author: "— 松尾芭蕉", theme: "春・湖", color: "#90c4e8" },
+
+  // 中国・四国
+  { name: "出雲大社 / 島根県", lng: 132.6847, lat: 35.4017, haiku: "神在月\n縁結びの神\n霧の中", author: "— 作者不詳", theme: "秋・神", color: "#e8d9a0" },
+  { name: "鳥取砂丘 / 鳥取県", lng: 134.2333, lat: 35.5333, haiku: "砂丘果て\n風紋のみや\n冬曇り", author: "— 作者不詳", theme: "冬・砂", color: "#e8d9a0" },
+  { name: "道後温泉 / 愛媛県", lng: 132.8872, lat: 33.8518, haiku: "湯の町や\n夕暮れ迫る\n道後の鐘", author: "— 正岡子規", theme: "秋・温泉", color: "#e8a0a0" },
+  { name: "高知 / 高知県", lng: 133.5311, lat: 33.5597, haiku: "土佐の海\n鰹一本\n夏の風", author: "— 作者不詳", theme: "夏・海", color: "#90c4e8" },
+  { name: "祖谷 / 徳島県", lng: 133.8667, lat: 33.8500, haiku: "かずら橋\n谷風渡る\n秋の声", author: "— 作者不詳", theme: "秋・谷", color: "#e8d9a0" },
+  { name: "瀬戸内海 / 岡山県", lng: 133.9350, lat: 34.6167, haiku: "島々や\n霞に浮かぶ\n内海かな", author: "— 作者不詳", theme: "春・海", color: "#90c4e8" },
+
+  // 九州・沖縄
+  { name: "阿蘇山 / 熊本県", lng: 131.0894, lat: 32.8843, haiku: "阿蘇の火\n夜空を染めて\n夏の果て", author: "— 作者不詳", theme: "夏・火山", color: "#e8d9a0" },
+  { name: "長崎 / 長崎県", lng: 129.8777, lat: 32.7503, haiku: "長崎の\n灯籠流しや\n秋の海", author: "— 作者不詳", theme: "秋・海", color: "#90c4e8" },
+  { name: "屋久島 / 鹿児島県", lng: 130.5258, lat: 30.3467, haiku: "縄文杉\n千年の雨に\n濡れにけり", author: "— 作者不詳", theme: "夏・森", color: "#e8d9a0" },
+  { name: "桜島 / 鹿児島県", lng: 130.6572, lat: 31.5819, haiku: "桜島\n噴煙高く\n春霞", author: "— 作者不詳", theme: "春・火山", color: "#e8d9a0" },
+  { name: "別府温泉 / 大分県", lng: 131.4908, lat: 33.2841, haiku: "地獄湯や\n湯気に霞む\n冬の朝", author: "— 作者不詳", theme: "冬・温泉", color: "#e8a0a0" },
+  { name: "那覇 / 沖縄県", lng: 127.6791, lat: 26.2124, haiku: "珊瑚礁\n南の海や\n夏果てず", author: "— 作者不詳", theme: "夏・海", color: "#90c4e8" },
+  { name: "竹富島 / 沖縄県", lng: 124.0639, lat: 24.3244, haiku: "珊瑚の道\n三線の音\n夕なぎ", author: "— 作者不詳", theme: "夏・島", color: "#90c4e8" },
+
+  // --- 海外の初期英語俳句・俳句に影響を受けた短詩 ---
+  { name: "Paris Métro / France", lng: 2.3522, lat: 48.8566, haiku: "The apparition of these faces in the crowd:\nPetals on a wet, black bough.", author: "— Ezra Pound", theme: "海外・都市", color: "#e8a0a0", language: "en", international: true },
+  { name: "Boston / Massachusetts, USA", lng: -71.0589, lat: 42.3601, haiku: "Is it a dragon fly or maple leaf\nThat settles softly down upon the water?", author: "— Amy Lowell", theme: "海外・秋", color: "#e8d9a0", language: "en", international: true },
+  { name: "Philadelphia / Pennsylvania, USA", lng: -75.1652, lat: 39.9526, haiku: "White petals afloat\nOn a winding woodland stream—\nWhat else is life's dream!", author: "— Sadakichi Hartmann", theme: "海外・春", color: "#90c4e8", language: "en", international: true },
+  { name: "Greenwich Village / New York, USA", lng: -74.0027, lat: 40.7336, haiku: "Butterflies a-wing—\nAre you flowers returning\nTo your branch in Spring?", author: "— Sadakichi Hartmann", theme: "海外・春", color: "#e8d9a0", language: "en", international: true },
+  { name: "Morongo Valley / California, USA", lng: -116.5809, lat: 34.0469, haiku: "At new moon we met!\nTwo weeks I've waited in vain.\nTo-night!—Don't forget.", author: "— Sadakichi Hartmann", theme: "海外・月", color: "#e8a0a0", language: "en", international: true },
+  { name: "St. Petersburg / Florida, USA", lng: -82.6403, lat: 27.7676, haiku: "Oh, red maple leaves,\nThere seem more of you these eves\nThan ever grew on trees.", author: "— Sadakichi Hartmann", theme: "海外・秋", color: "#e8d9a0", language: "en", international: true },
+];
+
+const map = new mapboxgl.Map({
+  container: 'map',
+  style: {
+    version: 8,
+    sources: {
+      'mapbox-style': {
+        type: 'raster',
+        tiles: [
+          'https://api.mapbox.com/styles/v1/aki-aogaku/cmp9qud90000k01ri7oy5bkx2/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoiYWtpLWFvZ2FrdSIsImEiOiJjbXA5cW0zaHcwbGZkMnBvZ2RleTM5b2sxIn0.7Gj-P35EuhV7W7iMhN6Plw'
+        ],
+        tileSize: 512,
+      }
+    },
+    layers: [
+      {
+        id: 'mapbox-style-layer',
+        type: 'raster',
+        source: 'mapbox-style',
+        minzoom: 0,
+        maxzoom: 22,
+      }
+    ]
+  },
+  center: [136.5, 37.5],
+  zoom: 5.5,
+});
+
+let draftLocation = null;
+let draftMarker = null;
+let isPickingLocation = false;
+let currentHaiku = null;
+
+haikuData.forEach(addHaikuMarker);
+if (!VERIFY_ONLY && !CLOUD_ENABLED) {
+  loadLocalPins().forEach(h => {
+    haikuData.push(h);
+    addHaikuMarker(h);
+  });
+}
+setupComposeForm();
+setupAccountSystem();
+setupRankingSystem();
+
+map.on('click', e => {
+  if (!isPickingLocation) return;
+  setDraftLocation(e.lngLat.lng, e.lngLat.lat);
+  stopPickingLocation();
+});
+
+function markerSvg(color) {
+  const pinColor = PIN_COLORS.includes(color) ? color : '#e8d9a0';
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <circle cx="15" cy="15" r="12" fill="${pinColor}" opacity="0.15"/>
+    <circle cx="15" cy="15" r="7" fill="${pinColor}" opacity="0.92"/>
+    <circle cx="15" cy="15" r="7" fill="none" stroke="white" stroke-width="1" opacity="0.3"/>
+  </svg>`;
+}
+
+function addHaikuMarker(h) {
+  const el = document.createElement('div');
+  el.className = 'haiku-marker';
+  el.setAttribute('role', 'button');
+  el.setAttribute('tabindex', '0');
+  el.setAttribute('aria-label', `${h.name}の俳句を読む`);
+  el.innerHTML = markerSvg(h.color);
+  el.addEventListener('click', e => {
+    e.stopPropagation();
+    showCard(h);
+  });
+  el.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    e.preventDefault();
+    showCard(h);
+  });
+
+  const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([h.lng, h.lat])
+    .addTo(map);
+  haikuMarkers.set(getHaikuId(h), marker);
+  return marker;
+}
+
+function showCard(h) {
+  currentHaiku = h;
+  document.getElementById('card-location').textContent = h.name;
+  renderHaikuText(document.getElementById('card-haiku'), h.haiku);
+  updateCardAuthor(h);
+  document.getElementById('card-theme').textContent = h.theme;
+  updateOkashiButton(h);
+  updateReplyArea(h);
+  updateDeleteButton(h);
+  const card = document.getElementById('card');
+  card.scrollTop = 0;
+  card.classList.add('visible');
+  document.getElementById('hint').classList.add('hidden');
+}
+
+function closeCard() {
+  document.getElementById('card').classList.remove('visible');
+  resetReplyForm();
+}
+
+function renderHaikuText(target, text) {
+  target.replaceChildren();
+  String(text).split('\n').forEach((line, index, lines) => {
+    target.append(document.createTextNode(line));
+    if (index < lines.length - 1) target.append(document.createElement('br'));
+  });
+}
+
+function setupComposeForm() {
+  const form = document.getElementById('compose');
+  const toggle = document.getElementById('compose-toggle');
+  const close = document.querySelector('.compose-close');
+  const pickButton = document.getElementById('pick-location');
+  const currentButton = document.getElementById('current-location');
+  const searchButton = document.getElementById('search-location');
+  const searchInput = document.getElementById('place-search');
+  const okashiButton = document.getElementById('okashi-button');
+  const replyForm = document.getElementById('reply-form');
+  const lineInputs = [
+    document.getElementById('compose-line-1'),
+    document.getElementById('compose-line-2'),
+    document.getElementById('compose-line-3'),
+  ];
+
+  toggle.addEventListener('click', () => {
+    const user = getCurrentUser();
+    if (!user) {
+      showAuthGate();
+      return;
+    }
+    document.getElementById('compose-author').value = user.displayName;
+    closeRankingPanel();
+    if (!form.classList.contains('visible')) closeCard();
+    form.classList.toggle('visible');
+    toggle.classList.toggle('active', form.classList.contains('visible'));
+    toggle.setAttribute('aria-expanded', String(form.classList.contains('visible')));
+  });
+
+  close.addEventListener('click', () => {
+    form.classList.remove('visible');
+    toggle.classList.remove('active');
+    toggle.setAttribute('aria-expanded', 'false');
+    stopPickingLocation();
+  });
+
+  pickButton.addEventListener('click', () => {
+    isPickingLocation ? stopPickingLocation() : startPickingLocation();
+  });
+
+  currentButton.addEventListener('click', useCurrentLocation);
+  searchButton.addEventListener('click', searchPlace);
+  searchInput.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    searchPlace();
+  });
+  okashiButton.addEventListener('click', toggleOkashi);
+  replyForm.addEventListener('submit', submitReply);
+
+  document.querySelectorAll('input[name="compose-category"]').forEach(input => {
+    input.addEventListener('change', updateDraftMarkerColor);
+  });
+
+  lineInputs.forEach(input => input.addEventListener('input', updateSyllableMeter));
+  updateSyllableMeter();
+
+  form.addEventListener('submit', e => {
+    e.preventDefault();
+    submitComposeForm(form);
+  });
+}
+
+function startPickingLocation() {
+  isPickingLocation = true;
+  document.body.classList.add('picking-location');
+  document.getElementById('pick-location').classList.add('active');
+  setComposeMessage('地図をクリックして場所を置いてください。');
+  closeCard();
+}
+
+function stopPickingLocation() {
+  isPickingLocation = false;
+  document.body.classList.remove('picking-location');
+  document.getElementById('pick-location').classList.remove('active');
+}
+
+function setDraftLocation(lng, lat) {
+  draftLocation = { lng, lat };
+  document.getElementById('compose-coords').textContent =
+    `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  setComposeMessage('この場所にピンを立てられます。');
+
+  if (draftMarker) draftMarker.remove();
+
+  const el = document.createElement('div');
+  el.className = 'haiku-marker draft-marker';
+  el.innerHTML = markerSvg(getSelectedColor());
+  draftMarker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+    .setLngLat([lng, lat])
+    .addTo(map);
+}
+
+function useCurrentLocation() {
+  if (!navigator.geolocation) {
+    setComposeMessage('このブラウザでは現在地を取得できません。', true);
+    return;
+  }
+
+  setLocationButtonBusy('current-location', true);
+  setComposeMessage('現在地を取得しています。');
+  closeCard();
+
+  navigator.geolocation.getCurrentPosition(
+    position => {
+      const { longitude, latitude } = position.coords;
+      setDraftLocation(longitude, latitude);
+      stopPickingLocation();
+      map.flyTo({ center: [longitude, latitude], zoom: Math.max(map.getZoom(), 13), essential: true });
+      fillNameFromCoordinates(longitude, latitude, '現在地');
+      setComposeMessage('現在地をセットしました。');
+      setLocationButtonBusy('current-location', false);
+    },
+    error => {
+      const message = error.code === error.PERMISSION_DENIED
+        ? '位置情報の許可が必要です。'
+        : '現在地を取得できませんでした。';
+      setComposeMessage(message, true);
+      setLocationButtonBusy('current-location', false);
+    },
+    { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 }
+  );
+}
+
+async function searchPlace() {
+  const input = document.getElementById('place-search');
+  const query = input.value.trim();
+  if (!query) {
+    setComposeMessage('検索したい場所を入力してください。', true);
+    input.focus();
+    return;
+  }
+
+  setLocationButtonBusy('search-location', true);
+  setComposeMessage('場所を探しています。');
+  closeCard();
+
+  try {
+    const center = map.getCenter();
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?language=ja&limit=1&proximity=${center.lng},${center.lat}&access_token=${mapboxgl.accessToken}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('search failed');
+
+    const data = await response.json();
+    const feature = data.features?.[0];
+    if (!feature?.center) {
+      setComposeMessage('場所が見つかりませんでした。', true);
+      return;
+    }
+
+    const [lng, lat] = feature.center;
+    const name = formatPlaceName(feature);
+    document.getElementById('compose-name').value = name;
+    setDraftLocation(lng, lat);
+    stopPickingLocation();
+    map.flyTo({ center: [lng, lat], zoom: Math.max(map.getZoom(), 11), essential: true });
+    setComposeMessage(`${name} をセットしました。`);
+  } catch {
+    setComposeMessage('場所検索に失敗しました。時間をおいて再度お試しください。', true);
+  } finally {
+    setLocationButtonBusy('search-location', false);
+  }
+}
+
+async function fillNameFromCoordinates(lng, lat, fallback) {
+  const nameInput = document.getElementById('compose-name');
+  if (nameInput.value.trim()) return;
+  nameInput.value = fallback;
+
+  try {
+    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${lng},${lat}.json?language=ja&limit=1&access_token=${mapboxgl.accessToken}`;
+    const response = await fetch(url);
+    if (!response.ok) return;
+    const data = await response.json();
+    const feature = data.features?.[0];
+    if (feature) nameInput.value = formatPlaceName(feature);
+  } catch {
+    nameInput.value = fallback;
+  }
+}
+
+function formatPlaceName(feature) {
+  return feature.place_name_ja || feature.place_name || feature.text_ja || feature.text || '検索地点';
+}
+
+function setLocationButtonBusy(id, busy) {
+  const button = document.getElementById(id);
+  button.disabled = busy;
+  button.style.opacity = busy ? '0.62' : '';
+}
+
+function updateDraftMarkerColor() {
+  if (!draftMarker) return;
+  draftMarker.getElement().innerHTML = markerSvg(getSelectedColor());
+}
+
+async function submitComposeForm(form) {
+  const user = getCurrentUser();
+  if (!user) {
+    showAuthGate();
+    return;
+  }
+  if (!form.reportValidity()) return;
+
+  if (!draftLocation) {
+    setComposeMessage('先に地図で場所を選んでください。', true);
+    return;
+  }
+
+  const lines = [
+    document.getElementById('compose-line-1').value.trim(),
+    document.getElementById('compose-line-2').value.trim(),
+    document.getElementById('compose-line-3').value.trim(),
+  ];
+  const selectedCategory = getSelectedCategory();
+  const h = {
+    id: createHaikuId(),
+    name: document.getElementById('compose-name').value.trim(),
+    lng: draftLocation.lng,
+    lat: draftLocation.lat,
+    haiku: lines.join('\n'),
+    author: `— ${user.displayName}`,
+    theme: document.getElementById('compose-theme').value.trim(),
+    category: selectedCategory,
+    color: getSelectedColor(),
+    createdAt: new Date().toISOString(),
+    userId: user.id,
+  };
+
+  haikuData.push(h);
+  addHaikuMarker(h);
+  if (CLOUD_ENABLED) {
+    try {
+      await cloudDb.collection('haikus').doc(h.id).set(serializeHaiku(h));
+      cloudHaikuIds.add(h.id);
+    } catch {
+      haikuMarkers.get(h.id)?.remove();
+      haikuMarkers.delete(h.id);
+      const failedIndex = haikuData.findIndex(item => getHaikuId(item) === h.id);
+      if (failedIndex >= 0) haikuData.splice(failedIndex, 1);
+      setComposeMessage('オンライン保存に失敗しました。通信状態を確認してください。', true);
+      return;
+    }
+  } else if (!VERIFY_ONLY) {
+    saveLocalPin(h);
+  }
+  if (draftMarker) draftMarker.remove();
+  draftMarker = null;
+  draftLocation = null;
+
+  form.reset();
+  document.getElementById('compose-author').value = user.displayName;
+  document.getElementById('compose-coords').textContent = '座標未選択';
+  updateSyllableMeter();
+  stopPickingLocation();
+  document.getElementById('compose').classList.remove('visible');
+  document.getElementById('compose-toggle').classList.remove('active');
+  document.getElementById('compose-toggle').setAttribute('aria-expanded', 'false');
+
+  map.flyTo({ center: [h.lng, h.lat], zoom: Math.max(map.getZoom(), 8), essential: true });
+  showCard(h);
+}
+
+function getSelectedColor() {
+  return CATEGORY_OPTIONS[getSelectedCategory()]?.color || '#e8d9a0';
+}
+
+function getSelectedCategory() {
+  const input = document.querySelector('input[name="compose-category"]:checked');
+  return CATEGORY_OPTIONS[input?.value] ? input.value : 'nature';
+}
+
+function updateSyllableMeter() {
+  const counts = [
+    countHaikuChars(document.getElementById('compose-line-1').value),
+    countHaikuChars(document.getElementById('compose-line-2').value),
+    countHaikuChars(document.getElementById('compose-line-3').value),
+  ];
+  const meter = document.getElementById('syllable-meter');
+  meter.textContent = `${counts[0]} / ${counts[1]} / ${counts[2]}`;
+  meter.classList.toggle('good', counts[0] === 5 && counts[1] === 7 && counts[2] === 5);
+}
+
+function countHaikuChars(text) {
+  return String(text).replace(/[\s、。,.!?！？「」『』（）()・ー-]/g, '').length;
+}
+
+function setComposeMessage(text, warn = false) {
+  const message = document.getElementById('compose-message');
+  message.textContent = text;
+  message.classList.toggle('warn', warn);
+}
+
+async function toggleOkashi() {
+  const user = getCurrentUser();
+  if (!currentHaiku || !user) return;
+
+  const id = getHaikuId(currentHaiku);
+  const counts = getHaikuOkashiCounts();
+  const liked = readJson(OKASHI_LIKED_KEY, {});
+  const likedKey = `${user.id}:${id}`;
+  const wasLiked = CLOUD_ENABLED
+    ? okashiEvents.some(event => event.haikuId === id && event.userId === user.id)
+    : Boolean(liked[likedKey]);
+  const nextCount = Math.max(0, Number(counts[id] || 0) + (wasLiked ? -1 : 1));
+
+  counts[id] = nextCount;
+  liked[likedKey] = !wasLiked;
+  if (wasLiked) {
+    okashiEvents = okashiEvents.filter(event =>
+      !(event.haikuId === id && event.userId === user.id)
+    );
+  } else {
+    okashiEvents.push({
+      haikuId: id,
+      userId: user.id,
+      createdAt: new Date().toISOString(),
+    });
+  }
+  if (CLOUD_ENABLED) {
+    const reactionId = `${user.id}_${simpleHash(id)}`;
+    const reference = cloudDb.collection('haikuReactions').doc(reactionId);
+    if (wasLiked) await reference.delete();
+    else await reference.set({
+      haikuId: id,
+      userId: user.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } else if (!VERIFY_ONLY) {
+    localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
+    localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
+    localStorage.setItem(OKASHI_EVENTS_KEY, JSON.stringify(okashiEvents));
+  }
+  updateOkashiButton(currentHaiku);
+  if (document.getElementById('ranking-panel').classList.contains('visible')) {
+    renderRanking();
+  }
+}
+
+function updateOkashiButton(h) {
+  const user = getCurrentUser();
+  const id = getHaikuId(h);
+  const counts = getHaikuOkashiCounts();
+  const liked = readJson(OKASHI_LIKED_KEY, {});
+  const button = document.getElementById('okashi-button');
+
+  document.getElementById('okashi-count').textContent = String(Number(counts[id] || 0));
+  const likedKey = user ? `${user.id}:${id}` : id;
+  const isLiked = CLOUD_ENABLED
+    ? okashiEvents.some(event => event.haikuId === id && event.userId === user?.id)
+    : Boolean(liked[likedKey]);
+  button.classList.toggle('liked', isLiked);
+  button.setAttribute('aria-pressed', String(isLiked));
+}
+
+function getHaikuOkashiCounts() {
+  if (!CLOUD_ENABLED) return readJson(OKASHI_STORAGE_KEY, {});
+  return okashiEvents.reduce((counts, event) => {
+    counts[event.haikuId] = Number(counts[event.haikuId] || 0) + 1;
+    return counts;
+  }, {});
+}
+
+function resetReplyForm() {
+  document.getElementById('reply-form').reset();
+  const user = getCurrentUser();
+  if (user) document.getElementById('reply-author').value = user.displayName;
+  setReplyMessage('');
+}
+
+function updateReplyArea(h) {
+  const id = getHaikuId(h);
+  const replies = getReplies(id);
+  const isOwnHaiku = h.userId && h.userId === getCurrentUser()?.id;
+
+  resetReplyForm();
+  document.getElementById('reply-count').textContent = String(replies.length);
+  document.getElementById('reply-summary').hidden = isOwnHaiku;
+  document.getElementById('reply-area').hidden = isOwnHaiku;
+  renderReplies(replies);
+}
+
+function renderReplies(replies) {
+  const list = document.getElementById('reply-list');
+  list.replaceChildren();
+  const orderedReplies = [...replies].sort((a, b) => {
+    const countDifference =
+      Number(replyOkashiCounts[b.id] || 0) - Number(replyOkashiCounts[a.id] || 0);
+    if (countDifference) return countDifference;
+    return String(a.createdAt || '').localeCompare(String(b.createdAt || ''));
+  });
+
+  if (!orderedReplies.length) {
+    const empty = document.createElement('div');
+    empty.className = 'reply-empty';
+    empty.textContent = 'まだ返句はありません。最初の一句を。';
+    list.append(empty);
+    return;
+  }
+
+  orderedReplies.forEach(reply => {
+    const user = getCurrentUser();
+    const likedKey = user ? `${user.id}:${reply.id}` : reply.id;
+    const item = document.createElement('article');
+    item.className = 'reply-item';
+    const haiku = document.createElement('div');
+    haiku.className = 'reply-haiku';
+    renderHaikuText(haiku, reply.haiku);
+    const author = document.createElement('div');
+    author.className = 'reply-author';
+    author.textContent = reply.author;
+    const okashiButton = document.createElement('button');
+    okashiButton.className = 'reply-okashi-button';
+    okashiButton.type = 'button';
+    okashiButton.textContent = `をかし ${Number(replyOkashiCounts[reply.id] || 0)}`;
+    okashiButton.classList.toggle('liked', Boolean(replyOkashiLiked[likedKey]));
+    okashiButton.setAttribute('aria-pressed', String(Boolean(replyOkashiLiked[likedKey])));
+    okashiButton.setAttribute(
+      'aria-label',
+      `${reply.author}の返句に「をかし」 ${Number(replyOkashiCounts[reply.id] || 0)}`
+    );
+    okashiButton.addEventListener('click', () => toggleReplyOkashi(reply.id));
+    const footer = document.createElement('div');
+    footer.className = 'reply-item-footer';
+    footer.append(author, okashiButton);
+    item.append(haiku, footer);
+    list.append(item);
+  });
+}
+
+async function toggleReplyOkashi(replyId) {
+  const user = getCurrentUser();
+  if (!currentHaiku || !user) return;
+  const likedKey = `${user.id}:${replyId}`;
+  const wasLiked = Boolean(replyOkashiLiked[likedKey]);
+
+  replyOkashiCounts[replyId] = Math.max(
+    0,
+    Number(replyOkashiCounts[replyId] || 0) + (wasLiked ? -1 : 1)
+  );
+  replyOkashiLiked[likedKey] = !wasLiked;
+  if (CLOUD_ENABLED) {
+    const reactionId = `${user.id}_${simpleHash(replyId)}`;
+    const reference = cloudDb.collection('replyReactions').doc(reactionId);
+    if (wasLiked) await reference.delete();
+    else await reference.set({
+      replyId,
+      userId: user.id,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+  } else if (!VERIFY_ONLY) {
+    localStorage.setItem(REPLY_OKASHI_STORAGE_KEY, JSON.stringify(replyOkashiCounts));
+    localStorage.setItem(REPLY_OKASHI_LIKED_KEY, JSON.stringify(replyOkashiLiked));
+  }
+  renderReplies(getReplies(getHaikuId(currentHaiku)));
+}
+
+async function submitReply(event) {
+  event.preventDefault();
+  const user = getCurrentUser();
+  if (!user) {
+    showAuthGate();
+    return;
+  }
+  if (!currentHaiku || currentHaiku.userId === user.id) return;
+
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+
+  const lines = [
+    document.getElementById('reply-line-1').value.trim(),
+    document.getElementById('reply-line-2').value.trim(),
+    document.getElementById('reply-line-3').value.trim(),
+  ];
+  if (lines.some(line => !line)) {
+    setReplyMessage('三行すべて入力してください。', true);
+    return;
+  }
+
+  const reply = {
+    id: createHaikuId(),
+    haiku: lines.join('\n'),
+    author: `— ${user.displayName}`,
+    createdAt: new Date().toISOString(),
+    userId: user.id,
+  };
+  const haikuId = getHaikuId(currentHaiku);
+  const replies = Array.isArray(replyStore[haikuId]) ? replyStore[haikuId] : [];
+  replies.push(reply);
+  replyStore[haikuId] = replies;
+  if (CLOUD_ENABLED) {
+    try {
+      await cloudDb.collection('replies').doc(reply.id).set({
+        ...reply,
+        haikuId,
+      });
+    } catch {
+      replies.pop();
+      if (!replies.length) delete replyStore[haikuId];
+      setReplyMessage('オンライン保存に失敗しました。', true);
+      return;
+    }
+  } else if (!VERIFY_ONLY) {
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+  }
+
+  form.reset();
+  document.getElementById('reply-count').textContent = String(replies.length);
+  renderReplies(replies);
+  setReplyMessage('返句を置きました。');
+}
+
+function getReplies(haikuId) {
+  const replies = replyStore[haikuId];
+  if (!Array.isArray(replies)) return [];
+  return replies.filter(reply =>
+    reply &&
+    typeof reply.haiku === 'string' &&
+    typeof reply.author === 'string'
+  );
+}
+
+function setReplyMessage(text, warn = false) {
+  const message = document.getElementById('reply-message');
+  message.textContent = text;
+  message.classList.toggle('warn', warn);
+}
+
+function setupRankingSystem() {
+  document.getElementById('ranking-toggle').addEventListener('click', () => {
+    const panel = document.getElementById('ranking-panel');
+    const willOpen = !panel.classList.contains('visible');
+    document.getElementById('compose').classList.remove('visible');
+    document.getElementById('compose-toggle').classList.remove('active');
+    document.getElementById('compose-toggle').setAttribute('aria-expanded', 'false');
+    closeCard();
+    panel.classList.toggle('visible', willOpen);
+    document.getElementById('ranking-toggle').classList.toggle('active', willOpen);
+    document.getElementById('ranking-toggle').setAttribute('aria-expanded', String(willOpen));
+    if (willOpen) renderRanking();
+  });
+  document.querySelector('.ranking-close').addEventListener('click', closeRankingPanel);
+  document.getElementById('weekly-ranking-tab').addEventListener('click', () => {
+    rankingPeriod = 'weekly';
+    renderRanking();
+  });
+  document.getElementById('monthly-ranking-tab').addEventListener('click', () => {
+    rankingPeriod = 'monthly';
+    renderRanking();
+  });
+  renderRanking();
+}
+
+function closeRankingPanel() {
+  document.getElementById('ranking-panel').classList.remove('visible');
+  document.getElementById('ranking-toggle').classList.remove('active');
+  document.getElementById('ranking-toggle').setAttribute('aria-expanded', 'false');
+}
+
+function renderRanking() {
+  const isWeekly = rankingPeriod === 'weekly';
+  const days = isWeekly ? 7 : 30;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const scores = new Map();
+  okashiEvents.forEach(event => {
+    const eventTime = Date.parse(event.createdAt);
+    if (!event.haikuId || !Number.isFinite(eventTime) || eventTime < cutoff) return;
+    scores.set(event.haikuId, (scores.get(event.haikuId) || 0) + 1);
+  });
+
+  const ranked = [...scores.entries()]
+    .map(([haikuId, score]) => ({
+      haiku: haikuData.find(item => getHaikuId(item) === haikuId),
+      score,
+    }))
+    .filter(entry => entry.haiku)
+    .sort((a, b) => b.score - a.score ||
+      String(a.haiku.createdAt || '').localeCompare(String(b.haiku.createdAt || '')))
+    .slice(0, 10);
+
+  document.getElementById('weekly-ranking-tab').classList.toggle('active', isWeekly);
+  document.getElementById('monthly-ranking-tab').classList.toggle('active', !isWeekly);
+  document.getElementById('weekly-ranking-tab').setAttribute('aria-selected', String(isWeekly));
+  document.getElementById('monthly-ranking-tab').setAttribute('aria-selected', String(!isWeekly));
+  document.getElementById('ranking-note').textContent =
+    `直近${days}日間に得た「をかし」`;
+
+  const list = document.getElementById('ranking-list');
+  list.replaceChildren();
+  if (!ranked.length) {
+    const empty = document.createElement('div');
+    empty.className = 'ranking-empty';
+    empty.textContent = 'この期間の「をかし」はまだありません。心に残った句へ「をかし」を贈ってみてください。';
+    list.append(empty);
+    return;
+  }
+
+  ranked.forEach((entry, index) => {
+    const button = document.createElement('button');
+    button.className = 'ranking-item';
+    button.type = 'button';
+    button.setAttribute('aria-label', `${index + 1}位 ${entry.haiku.author} をかし${entry.score}`);
+    const position = document.createElement('span');
+    position.className = 'ranking-position';
+    position.textContent = String(index + 1);
+    const content = document.createElement('span');
+    const haiku = document.createElement('span');
+    haiku.className = 'ranking-haiku';
+    haiku.textContent = String(entry.haiku.haiku).replace(/\n/g, ' / ');
+    const author = document.createElement('span');
+    author.className = 'ranking-author';
+    author.textContent = `${entry.haiku.author}・${entry.haiku.name}`;
+    content.append(haiku, author);
+    const score = document.createElement('span');
+    score.className = 'ranking-score';
+    score.textContent = `をかし ${entry.score}`;
+    button.append(position, content, score);
+    button.addEventListener('click', () => {
+      closeRankingPanel();
+      showCard(entry.haiku);
+      map.flyTo({
+        center: [entry.haiku.lng, entry.haiku.lat],
+        zoom: Math.max(map.getZoom(), 7),
+        essential: true,
+      });
+    });
+    list.append(button);
+  });
+}
+
+function setupAccountSystem() {
+  document.getElementById('login-tab').addEventListener('click', () => setAuthMode('login'));
+  document.getElementById('signup-tab').addEventListener('click', () => setAuthMode('signup'));
+  document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
+  document.getElementById('forgot-password').addEventListener('click', sendPasswordReset);
+  document.getElementById('account-button').addEventListener('click', toggleProfilePanel);
+  document.querySelector('.profile-close').addEventListener('click', closeProfilePanel);
+  document.getElementById('profile-form').addEventListener('submit', saveProfile);
+  document.getElementById('profile-icon-file').addEventListener('change', handleIconUpload);
+  document.getElementById('remove-icon-image').addEventListener('click', () => {
+    pendingIconImage = '';
+    renderUserIcon(document.getElementById('profile-preview-icon'), { icon: '🌿' });
+    document.getElementById('profile-icon-file').value = '';
+    document.getElementById('profile-message').textContent = '画像を外すにはプロフィールを保存してください。';
+  });
+  document.getElementById('logout-button').addEventListener('click', logout);
+  document.getElementById('friend-button').addEventListener('click', toggleCurrentFriend);
+  document.getElementById('delete-haiku-button').addEventListener('click', deleteCurrentHaiku);
+
+  document.getElementById('compose-author').readOnly = true;
+  document.getElementById('reply-author').readOnly = true;
+  setAuthMode('login');
+
+  if (CLOUD_ENABLED) {
+    showAuthGate();
+    cloudAuth.onAuthStateChanged(handleCloudAuthState);
+  } else {
+    currentUserId = null;
+    showAuthGate();
+    document.getElementById('auth-message').textContent =
+      'オンライン認証を読み込めません。ページを再読み込みしてください。';
+  }
+}
+
+function setAuthMode(mode) {
+  authMode = mode === 'signup' ? 'signup' : 'login';
+  const isSignup = authMode === 'signup';
+  document.getElementById('login-tab').classList.toggle('active', !isSignup);
+  document.getElementById('signup-tab').classList.toggle('active', isSignup);
+  document.getElementById('login-tab').setAttribute('aria-selected', String(!isSignup));
+  document.getElementById('signup-tab').setAttribute('aria-selected', String(isSignup));
+  document.getElementById('signup-name-field').hidden = !isSignup;
+  document.getElementById('auth-display-name').required = isSignup;
+  document.getElementById('auth-password').autocomplete = isSignup ? 'new-password' : 'current-password';
+  document.getElementById('auth-submit').textContent = isSignup ? 'アカウントを作る' : 'ログイン';
+  document.getElementById('auth-message').textContent = '';
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const username = document.getElementById('auth-username').value.trim().toLowerCase();
+  const password = document.getElementById('auth-password').value;
+  const displayName = document.getElementById('auth-display-name').value.trim();
+  const message = document.getElementById('auth-message');
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(username)) {
+    message.textContent = '正しいメールアドレスを入力してください。';
+    return;
+  }
+
+  if (!CLOUD_ENABLED) {
+    message.textContent = 'オンライン認証を読み込めません。ページを再読み込みしてください。';
+    return;
+  }
+  await handleFirebaseAuth(form, username, password, displayName, message);
+}
+
+async function handleFirebaseAuth(form, email, password, displayName, message) {
+  const submit = document.getElementById('auth-submit');
+  submit.disabled = true;
+  message.textContent = authMode === 'signup' ? 'アカウントを作成しています。' : 'ログインしています。';
+
+  try {
+    if (authMode === 'signup') {
+      if (!displayName) {
+        message.textContent = 'アカウントの名前を入力してください。';
+        return;
+      }
+      const credential = await cloudAuth.createUserWithEmailAndPassword(email, password);
+      await credential.user.updateProfile({ displayName });
+      await cloudDb.collection('users').doc(credential.user.uid).set({
+        id: credential.user.uid,
+        displayName,
+        icon: '🌿',
+        iconImage: '',
+        bio: '',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      });
+      await credential.user.sendEmailVerification({
+        url: 'https://akira-motoyoshi.github.io/HaikuGO/',
+      });
+      await cloudAuth.signOut();
+      form.reset();
+      setAuthMode('login');
+      message.textContent = '確認メールを送信しました。メール内のリンクを開いてからログインしてください。';
+      return;
+    }
+
+    const credential = await cloudAuth.signInWithEmailAndPassword(email, password);
+    if (!credential.user.emailVerified) {
+      await credential.user.sendEmailVerification({
+        url: 'https://akira-motoyoshi.github.io/HaikuGO/',
+      });
+      await cloudAuth.signOut();
+      message.textContent = 'メール確認が必要です。確認メールを再送しました。';
+      return;
+    }
+    form.reset();
+  } catch (error) {
+    const messages = {
+      'auth/email-already-in-use': 'このメールアドレスはすでに登録されています。',
+      'auth/invalid-credential': 'メールアドレスまたはパスワードが違います。',
+      'auth/invalid-email': '正しいメールアドレスを入力してください。',
+      'auth/weak-password': 'パスワードは6文字以上にしてください。',
+      'auth/too-many-requests': '試行回数が多すぎます。時間をおいて再度お試しください。',
+    };
+    message.textContent = messages[error.code] || '認証に失敗しました。もう一度お試しください。';
+  } finally {
+    submit.disabled = false;
+  }
+}
+
+async function sendPasswordReset() {
+  const email = document.getElementById('auth-username').value.trim().toLowerCase();
+  const message = document.getElementById('auth-message');
+  if (!CLOUD_ENABLED) {
+    message.textContent = 'オンライン認証を利用できません。';
+    return;
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    message.textContent = '先にメールアドレスを入力してください。';
+    return;
+  }
+  try {
+    await cloudAuth.sendPasswordResetEmail(email, {
+      url: 'https://akira-motoyoshi.github.io/HaikuGO/',
+    });
+    message.textContent = 'パスワード再設定メールを送信しました。';
+  } catch {
+    message.textContent = '再設定メールを送信できませんでした。';
+  }
+}
+
+async function handleCloudAuthState(firebaseUser) {
+  if (!firebaseUser) {
+    stopCloudSync();
+    currentUserId = null;
+    showAuthGate();
+    return;
+  }
+  if (!firebaseUser.emailVerified) {
+    stopCloudSync();
+    currentUserId = null;
+    showAuthGate();
+    return;
+  }
+  const userDoc = await cloudDb.collection('users').doc(firebaseUser.uid).get();
+  const profile = userDoc.exists ? userDoc.data() : {
+    id: firebaseUser.uid,
+    displayName: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+    icon: '🌿',
+    iconImage: '',
+    bio: '',
+  };
+  profile.id = firebaseUser.uid;
+  profile.username = firebaseUser.email;
+  usersStore[firebaseUser.uid] = profile;
+  currentUserId = firebaseUser.uid;
+  hideAuthGate();
+  renderAccountUI();
+  startCloudSync();
+  await migrateLocalContentToCloud();
+}
+
+function getCurrentUser() {
+  return currentUserId ? usersStore[currentUserId] || null : null;
+}
+
+function persistAccountState() {
+  if (CLOUD_ENABLED && currentUserId) {
+    const user = getCurrentUser();
+    cloudDb.collection('users').doc(currentUserId).set({
+      id: user.id,
+      displayName: user.displayName,
+      icon: user.icon || '🌿',
+      iconImage: user.iconImage || '',
+      bio: user.bio || '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    cloudDb.collection('friendships').doc(currentUserId).set({
+      userId: currentUserId,
+      friendIds: getFriendIds(currentUserId),
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+    return;
+  }
+  if (!VERIFY_ONLY) {
+    localStorage.setItem(USERS_STORAGE_KEY, JSON.stringify(usersStore));
+    localStorage.setItem(FRIENDS_STORAGE_KEY, JSON.stringify(friendsStore));
+  }
+  persistSession();
+}
+
+function persistSession() {
+  if (CLOUD_ENABLED) return;
+  if (VERIFY_ONLY) return;
+  if (currentUserId) localStorage.setItem(SESSION_STORAGE_KEY, currentUserId);
+  else localStorage.removeItem(SESSION_STORAGE_KEY);
+}
+
+function showAuthGate() {
+  closeProfilePanel();
+  document.getElementById('account-button').classList.remove('visible');
+  document.getElementById('auth-gate').classList.remove('hidden');
+}
+
+function hideAuthGate() {
+  document.getElementById('auth-gate').classList.add('hidden');
+}
+
+function renderAccountUI() {
+  const user = getCurrentUser();
+  if (!user) return;
+  const accountButton = document.getElementById('account-button');
+  accountButton.classList.add('visible');
+  renderUserIcon(document.getElementById('account-icon'), user);
+  document.getElementById('account-name').textContent = user.displayName;
+  document.getElementById('compose-author').value = user.displayName;
+  document.getElementById('reply-author').value = user.displayName;
+  renderProfilePanel();
+  if (currentHaiku) {
+    updateCardAuthor(currentHaiku);
+    updateOkashiButton(currentHaiku);
+    updateReplyArea(currentHaiku);
+    updateDeleteButton(currentHaiku);
+  }
+}
+
+function toggleProfilePanel() {
+  const panel = document.getElementById('profile-panel');
+  const willOpen = !panel.classList.contains('visible');
+  panel.classList.toggle('visible', willOpen);
+  document.getElementById('account-button').setAttribute('aria-expanded', String(willOpen));
+  if (willOpen) renderProfilePanel();
+}
+
+function closeProfilePanel() {
+  document.getElementById('profile-panel').classList.remove('visible');
+  document.getElementById('account-button').setAttribute('aria-expanded', 'false');
+}
+
+function renderProfilePanel() {
+  const user = getCurrentUser();
+  if (!user) return;
+  renderUserIcon(document.getElementById('profile-preview-icon'), user);
+  document.getElementById('profile-preview-name').textContent = user.displayName;
+  const accountEmail = CLOUD_ENABLED ? cloudAuth.currentUser?.email : user.username;
+  document.getElementById('profile-username').textContent = accountEmail || '';
+  document.getElementById('profile-name').value = user.displayName;
+  pendingIconImage = user.iconImage || '';
+  document.getElementById('profile-icon-file').value = '';
+  document.getElementById('profile-bio').value = user.bio || '';
+  document.getElementById('profile-okashi').textContent = String(getReceivedOkashi(user.id));
+  document.getElementById('profile-haiku-count').textContent =
+    String(haikuData.filter(haiku => haiku.userId === user.id).length);
+  document.getElementById('profile-friend-count').textContent =
+    String(getFriendIds(user.id).length);
+  document.getElementById('profile-message').textContent = '';
+  renderFriendList();
+}
+
+async function saveProfile(event) {
+  event.preventDefault();
+  const user = getCurrentUser();
+  if (!user) return;
+  const displayName = document.getElementById('profile-name').value.trim();
+  if (!displayName) return;
+
+  user.displayName = displayName;
+  user.iconImage = pendingIconImage || '';
+  user.bio = document.getElementById('profile-bio').value.trim();
+  updateAuthoredNames(user);
+  if (CLOUD_ENABLED) {
+    await cloudAuth.currentUser?.updateProfile({ displayName });
+    await cloudDb.collection('users').doc(user.id).set({
+      id: user.id,
+      displayName: user.displayName,
+      icon: user.icon || '🌿',
+      iconImage: user.iconImage,
+      bio: user.bio,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+  } else {
+    persistAccountState();
+  }
+  renderAccountUI();
+  document.getElementById('profile-panel').classList.add('visible');
+  document.getElementById('account-button').setAttribute('aria-expanded', 'true');
+  document.getElementById('profile-message').textContent = 'プロフィールを保存しました。';
+}
+
+function updateAuthoredNames(user) {
+  haikuData.forEach(haiku => {
+    if (haiku.userId === user.id) haiku.author = `— ${user.displayName}`;
+  });
+  Object.values(replyStore).forEach(replies => {
+    if (!Array.isArray(replies)) return;
+    replies.forEach(reply => {
+      if (reply.userId === user.id) reply.author = `— ${user.displayName}`;
+    });
+  });
+  if (CLOUD_ENABLED) {
+    Promise.all([
+      cloudDb.collection('haikus').where('userId', '==', user.id).get(),
+      cloudDb.collection('replies').where('userId', '==', user.id).get(),
+    ]).then(([haikus, replies]) => {
+      const batch = cloudDb.batch();
+      haikus.forEach(document => batch.update(document.ref, { author: `— ${user.displayName}` }));
+      replies.forEach(document => batch.update(document.ref, { author: `— ${user.displayName}` }));
+      return batch.commit();
+    });
+  } else if (!VERIFY_ONLY) {
+    const pins = loadLocalPins();
+    pins.forEach(haiku => {
+      if (haiku.userId === user.id) haiku.author = `— ${user.displayName}`;
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+  }
+}
+
+function logout() {
+  if (CLOUD_ENABLED) {
+    cloudAuth.signOut();
+    closeCard();
+    closeProfilePanel();
+    setAuthMode('login');
+    return;
+  }
+  currentUserId = null;
+  persistSession();
+  closeCard();
+  closeProfilePanel();
+  setAuthMode('login');
+  showAuthGate();
+}
+
+function updateDeleteButton(h) {
+  const user = getCurrentUser();
+  document.getElementById('delete-haiku-button').hidden =
+    !user || h.userId !== user.id;
+}
+
+async function deleteCurrentHaiku() {
+  const user = getCurrentUser();
+  if (!currentHaiku || !user || currentHaiku.userId !== user.id) return;
+  const confirmed = window.confirm('この俳句と、この句に付いた返句を削除しますか？');
+  if (!confirmed) return;
+
+  const haikuId = getHaikuId(currentHaiku);
+  if (CLOUD_ENABLED) {
+    const batch = cloudDb.batch();
+    batch.delete(cloudDb.collection('haikus').doc(haikuId));
+    const [replies, reactions] = await Promise.all([
+      cloudDb.collection('replies').where('haikuId', '==', haikuId).get(),
+      cloudDb.collection('haikuReactions').where('haikuId', '==', haikuId).get(),
+    ]);
+    replies.forEach(document => batch.delete(document.ref));
+    reactions.forEach(document => batch.delete(document.ref));
+    await batch.commit();
+    closeCard();
+    currentHaiku = null;
+    return;
+  }
+  haikuMarkers.get(haikuId)?.remove();
+  haikuMarkers.delete(haikuId);
+  const index = haikuData.findIndex(haiku => getHaikuId(haiku) === haikuId);
+  if (index >= 0) haikuData.splice(index, 1);
+  delete replyStore[haikuId];
+  okashiEvents = okashiEvents.filter(event => event.haikuId !== haikuId);
+
+  if (!VERIFY_ONLY) {
+    const pins = loadLocalPins().filter(haiku => getHaikuId(haiku) !== haikuId);
+    const counts = readJson(OKASHI_STORAGE_KEY, {});
+    const liked = readJson(OKASHI_LIKED_KEY, {});
+    delete counts[haikuId];
+    Object.keys(liked).forEach(key => {
+      if (key === haikuId || key.endsWith(`:${haikuId}`)) delete liked[key];
+    });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+    localStorage.setItem(REPLY_STORAGE_KEY, JSON.stringify(replyStore));
+    localStorage.setItem(OKASHI_STORAGE_KEY, JSON.stringify(counts));
+    localStorage.setItem(OKASHI_LIKED_KEY, JSON.stringify(liked));
+    localStorage.setItem(OKASHI_EVENTS_KEY, JSON.stringify(okashiEvents));
+  }
+
+  closeCard();
+  currentHaiku = null;
+  renderRanking();
+  renderProfilePanel();
+}
+
+async function handleIconUpload(event) {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  const message = document.getElementById('profile-message');
+  if (!file) return;
+  if (!file.type.startsWith('image/')) {
+    message.textContent = '画像ファイルを選んでください。';
+    input.value = '';
+    return;
+  }
+  if (file.size > 2 * 1024 * 1024) {
+    message.textContent = '画像は2MB以下にしてください。';
+    input.value = '';
+    return;
+  }
+
+  try {
+    pendingIconImage = await compressProfileImage(file);
+    renderUserIcon(document.getElementById('profile-preview-icon'), {
+      icon: getCurrentUser()?.icon || '🌿',
+      iconImage: pendingIconImage,
+    });
+    message.textContent = '画像を選びました。プロフィールを保存してください。';
+  } catch {
+    message.textContent = '画像を読み込めませんでした。';
+  }
+}
+
+function compressProfileImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.addEventListener('error', reject);
+    reader.addEventListener('load', () => {
+      const image = new Image();
+      image.addEventListener('error', reject);
+      image.addEventListener('load', () => {
+        const size = 256;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const context = canvas.getContext('2d');
+        const scale = Math.max(size / image.width, size / image.height);
+        const width = image.width * scale;
+        const height = image.height * scale;
+        context.drawImage(image, (size - width) / 2, (size - height) / 2, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      });
+      image.src = String(reader.result || '');
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderUserIcon(target, profile) {
+  target.replaceChildren();
+  if (profile?.iconImage) {
+    const image = document.createElement('img');
+    image.src = profile.iconImage;
+    image.alt = '';
+    target.append(image);
+    return;
+  }
+  target.textContent = profile?.icon || '🌿';
+}
+
+function updateCardAuthor(h) {
+  const profile = getAuthorProfile(h);
+  document.getElementById('card-author').textContent = `— ${profile.displayName}`;
+  renderUserIcon(document.getElementById('card-author-icon'), profile);
+  const friendButton = document.getElementById('friend-button');
+  const user = getCurrentUser();
+  const isOwn = Boolean(user && profile.id === user.id);
+  friendButton.hidden = isOwn || !user;
+  friendButton.dataset.profileId = profile.id;
+  const added = user ? getFriendIds(user.id).includes(profile.id) : false;
+  friendButton.classList.toggle('added', added);
+  friendButton.textContent = added ? '俳友です' : '俳友に追加';
+}
+
+function getAuthorProfile(h) {
+  if (h.userId && usersStore[h.userId]) return usersStore[h.userId];
+  const displayName = String(h.author || '作者不詳').replace(/^[-—]\s*/, '');
+  const id = h.userId || `author:${simpleHash(displayName)}`;
+  const icons = ['✒️', '🌙', '🌿', '🍁', '🐦'];
+  return {
+    id,
+    displayName,
+    icon: icons[parseInt(simpleHash(displayName), 36) % icons.length] || '✒️',
+    bio: `${h.theme || '俳句'}を詠む俳人`,
+  };
+}
+
+function getProfileById(profileId) {
+  if (usersStore[profileId]) return usersStore[profileId];
+  const haiku = haikuData.find(item => getAuthorProfile(item).id === profileId);
+  return haiku ? getAuthorProfile(haiku) : null;
+}
+
+function simpleHash(text) {
+  let hash = 0;
+  for (const character of String(text)) {
+    hash = (hash * 31 + character.codePointAt(0)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+function getFriendIds(userId) {
+  return Array.isArray(friendsStore[userId]) ? friendsStore[userId] : [];
+}
+
+function toggleCurrentFriend() {
+  const user = getCurrentUser();
+  const profileId = document.getElementById('friend-button').dataset.profileId;
+  if (!user || !profileId || profileId === user.id) return;
+  const friendIds = getFriendIds(user.id);
+  const index = friendIds.indexOf(profileId);
+  if (index >= 0) friendIds.splice(index, 1);
+  else friendIds.push(profileId);
+  friendsStore[user.id] = friendIds;
+  persistAccountState();
+  updateCardAuthor(currentHaiku);
+  renderProfilePanel();
+}
+
+function renderFriendList() {
+  const user = getCurrentUser();
+  const list = document.getElementById('friend-list');
+  list.replaceChildren();
+  if (!user) return;
+  const profiles = getFriendIds(user.id).map(getProfileById).filter(Boolean);
+  if (!profiles.length) {
+    const empty = document.createElement('div');
+    empty.className = 'friend-empty';
+    empty.textContent = '俳句カードから作者を俳友に追加できます。';
+    list.append(empty);
+    return;
+  }
+
+  profiles.forEach(profile => {
+    const item = document.createElement('div');
+    item.className = 'friend-item';
+    const icon = document.createElement('span');
+    icon.className = 'user-icon';
+    renderUserIcon(icon, profile);
+    const info = document.createElement('div');
+    info.className = 'friend-info';
+    const name = document.createElement('div');
+    name.className = 'friend-name';
+    name.textContent = profile.displayName;
+    const bio = document.createElement('div');
+    bio.className = 'friend-bio';
+    bio.textContent = profile.bio || 'まだbioはありません';
+    info.append(name, bio);
+    const remove = document.createElement('button');
+    remove.className = 'friend-remove';
+    remove.type = 'button';
+    remove.textContent = '解除';
+    remove.setAttribute('aria-label', `${profile.displayName}を俳友から解除`);
+    remove.addEventListener('click', () => {
+      friendsStore[user.id] = getFriendIds(user.id).filter(id => id !== profile.id);
+      persistAccountState();
+      renderProfilePanel();
+      if (currentHaiku) updateCardAuthor(currentHaiku);
+    });
+    item.append(icon, info, remove);
+    list.append(item);
+  });
+}
+
+function getReceivedOkashi(userId) {
+  const haikuCounts = getHaikuOkashiCounts();
+  const haikuTotal = haikuData
+    .filter(haiku => haiku.userId === userId)
+    .reduce((sum, haiku) => sum + Number(haikuCounts[getHaikuId(haiku)] || 0), 0);
+  const replyTotal = Object.values(replyStore)
+    .flatMap(replies => Array.isArray(replies) ? replies : [])
+    .filter(reply => reply.userId === userId)
+    .reduce((sum, reply) => sum + Number(replyOkashiCounts[reply.id] || 0), 0);
+  return haikuTotal + replyTotal;
+}
+
+function startCloudSync() {
+  if (!CLOUD_ENABLED || cloudSyncStarted || !currentUserId) return;
+  cloudSyncStarted = true;
+
+  cloudUnsubscribers.push(
+    cloudDb.collection('users').onSnapshot(snapshot => {
+      snapshot.forEach(document => {
+        usersStore[document.id] = {
+          ...usersStore[document.id],
+          id: document.id,
+          ...document.data(),
+        };
+      });
+      renderAccountUI();
+      if (currentHaiku) updateCardAuthor(currentHaiku);
+    }),
+    cloudDb.collection('haikus').onSnapshot(snapshot => {
+      cloudHaikuIds.forEach(id => {
+        haikuMarkers.get(id)?.remove();
+        haikuMarkers.delete(id);
+        const index = haikuData.findIndex(haiku => getHaikuId(haiku) === id);
+        if (index >= 0) haikuData.splice(index, 1);
+      });
+      cloudHaikuIds.clear();
+
+      snapshot.forEach(document => {
+        const h = deserializeCloudData({ id: document.id, ...document.data() });
+        if (!h.name || !h.haiku || !Number.isFinite(h.lng) || !Number.isFinite(h.lat)) return;
+        cloudHaikuIds.add(h.id);
+        haikuData.push(h);
+        addHaikuMarker(h);
+      });
+      renderRanking();
+      renderProfilePanel();
+    }),
+    cloudDb.collection('replies').onSnapshot(snapshot => {
+      replyStore = {};
+      snapshot.forEach(document => {
+        const reply = deserializeCloudData({ id: document.id, ...document.data() });
+        if (!reply.haikuId) return;
+        if (!replyStore[reply.haikuId]) replyStore[reply.haikuId] = [];
+        replyStore[reply.haikuId].push(reply);
+      });
+      if (currentHaiku) updateReplyArea(currentHaiku);
+    }),
+    cloudDb.collection('haikuReactions').onSnapshot(snapshot => {
+      okashiEvents = [];
+      snapshot.forEach(document => {
+        okashiEvents.push(deserializeCloudData({ id: document.id, ...document.data() }));
+      });
+      if (currentHaiku) updateOkashiButton(currentHaiku);
+      renderRanking();
+      renderProfilePanel();
+    }),
+    cloudDb.collection('replyReactions').onSnapshot(snapshot => {
+      replyOkashiCounts = {};
+      replyOkashiLiked = {};
+      snapshot.forEach(document => {
+        const reaction = deserializeCloudData({ id: document.id, ...document.data() });
+        if (!reaction.replyId) return;
+        replyOkashiCounts[reaction.replyId] = Number(replyOkashiCounts[reaction.replyId] || 0) + 1;
+        replyOkashiLiked[`${reaction.userId}:${reaction.replyId}`] = true;
+      });
+      if (currentHaiku) renderReplies(getReplies(getHaikuId(currentHaiku)));
+      renderProfilePanel();
+    }),
+    cloudDb.collection('friendships').doc(currentUserId).onSnapshot(document => {
+      friendsStore[currentUserId] = document.exists && Array.isArray(document.data().friendIds)
+        ? document.data().friendIds
+        : [];
+      renderFriendList();
+      renderProfilePanel();
+      if (currentHaiku) updateCardAuthor(currentHaiku);
+    })
+  );
+}
+
+function stopCloudSync() {
+  cloudUnsubscribers.splice(0).forEach(unsubscribe => unsubscribe());
+  cloudSyncStarted = false;
+}
+
+function deserializeCloudData(data) {
+  const result = { ...data };
+  Object.keys(result).forEach(key => {
+    if (result[key]?.toDate) result[key] = result[key].toDate().toISOString();
+  });
+  return result;
+}
+
+function serializeHaiku(h) {
+  return {
+    id: h.id,
+    name: h.name,
+    lng: h.lng,
+    lat: h.lat,
+    haiku: h.haiku,
+    author: h.author,
+    theme: h.theme,
+    category: h.category || 'nature',
+    color: h.color,
+    createdAt: h.createdAt,
+    userId: h.userId,
+  };
+}
+
+async function migrateLocalContentToCloud() {
+  if (!CLOUD_ENABLED || !currentUserId || localStorage.getItem(`haiku_go_migrated_${currentUserId}`)) return;
+  const pins = loadLocalPins();
+  if (!pins.length) {
+    localStorage.setItem(`haiku_go_migrated_${currentUserId}`, 'true');
+    return;
+  }
+  const user = getCurrentUser();
+  const batch = cloudDb.batch();
+  pins.forEach(pin => {
+    pin.id = pin.id || createHaikuId();
+    pin.userId = currentUserId;
+    pin.author = `— ${user.displayName}`;
+    batch.set(cloudDb.collection('haikus').doc(pin.id), serializeHaiku(pin));
+  });
+  await batch.commit();
+  localStorage.setItem(`haiku_go_migrated_${currentUserId}`, 'true');
+}
+
+function getHaikuId(h) {
+  if (h.id) return h.id;
+  return `seed:${h.name}:${h.author}:${h.haiku}`;
+}
+
+function createHaikuId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `local:${Date.now()}:${Math.random().toString(36).slice(2)}`;
+}
+
+function readJson(key, fallback) {
+  try {
+    const value = JSON.parse(localStorage.getItem(key) || 'null');
+    return value && typeof value === 'object' ? value : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function loadLocalPins() {
+  try {
+    const pins = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    if (!Array.isArray(pins)) return [];
+    return pins.filter(h =>
+      h &&
+      typeof h.name === 'string' &&
+      typeof h.haiku === 'string' &&
+      Number.isFinite(h.lng) &&
+      Number.isFinite(h.lat) &&
+      PIN_COLORS.includes(h.color)
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalPin(h) {
+  const pins = loadLocalPins();
+  pins.push(h);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(pins));
+}
+</script>
+</body>
+</html>
