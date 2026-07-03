@@ -324,7 +324,21 @@
     .profile-stat {
       padding: 10px 6px;
       border: 1px solid rgba(232, 217, 160, 0.12);
+      background: transparent;
+      font-family: 'Noto Serif JP', serif;
       text-align: center;
+    }
+
+    button.profile-stat {
+      width: 100%;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    button.profile-stat:hover,
+    button.profile-stat[aria-expanded="true"] {
+      border-color: rgba(232, 217, 160, 0.38);
+      background: rgba(232, 217, 160, 0.06);
     }
 
     .profile-stat strong {
@@ -351,6 +365,10 @@
       font-size: 10px;
       letter-spacing: 0.24em;
       margin: 22px 0 9px;
+    }
+
+    .friends-section[hidden] {
+      display: none;
     }
 
     .friend-list {
@@ -824,6 +842,41 @@
       letter-spacing: 0.22em;
     }
 
+    .reply-author-wrap {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      min-width: 0;
+    }
+
+    .reply-author-icon {
+      width: 29px;
+      height: 29px;
+      flex: 0 0 29px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 1px solid rgba(144, 196, 232, 0.24);
+      border-radius: 50%;
+      background: rgba(144, 196, 232, 0.05);
+      color: #90c4e8;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+    }
+
+    .reply-author-icon:hover,
+    .reply-author-icon.added {
+      border-color: rgba(232, 217, 160, 0.55);
+      background: rgba(232, 217, 160, 0.1);
+    }
+
+    .reply-author-icon .user-icon {
+      width: 23px;
+      height: 23px;
+      flex-basis: 23px;
+      font-size: 12px;
+    }
+
     .reply-item-footer {
       display: flex;
       align-items: center;
@@ -862,6 +915,10 @@
     .reply-form {
       display: grid;
       gap: 8px;
+    }
+
+    .reply-form[hidden] {
+      display: none;
     }
 
     .reply-lines {
@@ -916,6 +973,133 @@
     }
 
     #reply-message.warn { color: #e8a0a0; }
+
+    #ink-intro {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      overflow: hidden;
+      background: #f2ede1;
+      pointer-events: all;
+      animation: inkIntroFade 4.2s cubic-bezier(0.7, 0, 0.25, 1) forwards;
+    }
+
+    .intro-title {
+      position: absolute;
+      left: 7vw;
+      bottom: 8vh;
+      z-index: 4;
+      color: rgba(24, 20, 17, 0.74);
+      font-family: 'Shippori Mincho', serif;
+      font-size: clamp(22px, 3vw, 42px);
+      letter-spacing: 0.28em;
+      animation: introTitle 4.2s ease forwards;
+    }
+
+    .intro-brush {
+      position: absolute;
+      z-index: 5;
+      left: -42vw;
+      top: 15vh;
+      width: min(58vw, 620px);
+      filter: drop-shadow(0 18px 16px rgba(0, 0, 0, 0.24));
+      transform: rotate(-8deg);
+      transform-origin: 80% 50%;
+      animation: brushSweep 1.65s cubic-bezier(0.36, 0.02, 0.3, 1) 0.18s forwards;
+    }
+
+    .intro-brush svg {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
+    .ink-trail {
+      position: absolute;
+      z-index: 2;
+      left: 5vw;
+      top: 43vh;
+      width: 0;
+      height: clamp(42px, 8vw, 94px);
+      border-radius: 52% 38% 44% 55%;
+      background:
+        radial-gradient(circle at 13% 45%, #0d0c0b 0 22%, transparent 24%),
+        linear-gradient(90deg, #0d0c0b 0%, #171412 62%, #050505 100%);
+      filter: blur(1.5px);
+      transform: rotate(-2deg);
+      animation: trailDraw 1.5s cubic-bezier(0.34, 0.03, 0.27, 1) 0.38s forwards;
+    }
+
+    .ink-drop {
+      position: absolute;
+      z-index: 3;
+      left: 68vw;
+      top: 45vh;
+      width: 18px;
+      height: 18px;
+      border-radius: 50% 44% 52% 47%;
+      background: #050505;
+      opacity: 0;
+      animation: inkDrop 0.72s cubic-bezier(0.3, 0, 0.6, 1) 1.22s forwards;
+    }
+
+    .ink-spread {
+      position: absolute;
+      z-index: 3;
+      left: 66vw;
+      top: 67vh;
+      width: 74px;
+      height: 66px;
+      border-radius: 42% 58% 46% 54%;
+      background:
+        radial-gradient(circle at 38% 36%, #25211d 0 8%, #090807 42%, #000 72%);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.05);
+      animation: inkSpread 2.05s cubic-bezier(0.62, 0, 0.2, 1) 1.58s forwards;
+    }
+
+    @keyframes brushSweep {
+      0% { left: -42vw; top: 15vh; transform: rotate(-9deg) scale(1.18); }
+      58% { transform: rotate(-5deg) scale(1.22); }
+      100% { left: 72vw; top: 23vh; transform: rotate(4deg) scale(1.12); }
+    }
+
+    @keyframes trailDraw {
+      0% { width: 0; opacity: 0; }
+      8% { opacity: 1; }
+      100% { width: 69vw; opacity: 1; }
+    }
+
+    @keyframes inkDrop {
+      0% { opacity: 0; transform: translateY(-8vh) scale(0.4); }
+      35% { opacity: 1; }
+      100% { opacity: 1; transform: translateY(22vh) scale(1.35); }
+    }
+
+    @keyframes inkSpread {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.05); }
+      9% { opacity: 1; }
+      64% { opacity: 1; transform: translate(-50%, -50%) scale(23); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(31); }
+    }
+
+    @keyframes introTitle {
+      0%, 58% { opacity: 0; transform: translateY(12px); }
+      72% { opacity: 0.9; transform: translateY(0); }
+      100% { opacity: 0; }
+    }
+
+    @keyframes inkIntroFade {
+      0%, 72% { background-color: #f2ede1; }
+      88% { background-color: rgba(242, 237, 225, 0.35); }
+      100% { background-color: transparent; opacity: 0; visibility: hidden; pointer-events: none; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      #ink-intro {
+        animation-duration: 0.01ms;
+      }
+    }
 
     .card-close {
       position: absolute;
@@ -1287,6 +1471,33 @@
 </head>
 <body>
 
+<div id="ink-intro" aria-hidden="true">
+  <div class="ink-trail"></div>
+  <div class="ink-drop"></div>
+  <div class="ink-spread"></div>
+  <div class="intro-brush">
+    <svg viewBox="0 0 760 190" role="presentation">
+      <defs>
+        <linearGradient id="brush-handle" x1="0" x2="1">
+          <stop offset="0" stop-color="#4d1f14"/>
+          <stop offset="0.48" stop-color="#a96e3f"/>
+          <stop offset="1" stop-color="#3b1710"/>
+        </linearGradient>
+        <linearGradient id="brush-bristle" x1="0" x2="1">
+          <stop offset="0" stop-color="#2d2924"/>
+          <stop offset="0.7" stop-color="#090807"/>
+          <stop offset="1" stop-color="#000"/>
+        </linearGradient>
+      </defs>
+      <path d="M24 80 Q42 48 82 45 L542 64 Q584 68 600 87 Q575 110 536 111 L80 121 Q39 122 24 92Z" fill="url(#brush-handle)"/>
+      <path d="M520 61 Q594 52 642 72 L650 116 Q585 126 520 112Z" fill="#b9a47a"/>
+      <path d="M636 69 Q704 72 746 104 Q704 133 639 120 Q620 96 636 69Z" fill="url(#brush-bristle)"/>
+      <path d="M691 82 Q729 92 756 107 Q727 109 681 101Z" fill="#030303" opacity=".9"/>
+    </svg>
+  </div>
+  <div class="intro-title">俳句GO</div>
+</div>
+
 <div id="map"></div>
 
 <div id="auth-gate">
@@ -1350,7 +1561,9 @@
     <div class="profile-stats">
       <div class="profile-stat"><strong id="profile-okashi">0</strong><span>獲得をかし</span></div>
       <div class="profile-stat"><strong id="profile-haiku-count">0</strong><span>投稿した句</span></div>
-      <div class="profile-stat"><strong id="profile-friend-count">0</strong><span>俳友</span></div>
+      <button class="profile-stat" id="profile-friends-toggle" type="button" aria-expanded="false" aria-controls="friends-section">
+        <strong id="profile-friend-count">0</strong><span>俳友を見る</span>
+      </button>
     </div>
     <form class="profile-form" id="profile-form">
       <label class="profile-field">
@@ -1372,8 +1585,10 @@
       <div id="profile-message" aria-live="polite"></div>
       <button class="profile-save" type="submit">プロフィールを保存</button>
     </form>
-    <div class="friends-heading">俳友</div>
-    <div class="friend-list" id="friend-list"></div>
+    <section class="friends-section" id="friends-section" aria-label="俳友一覧" hidden>
+      <div class="friends-heading">俳友一覧</div>
+      <div class="friend-list" id="friend-list"></div>
+    </section>
     <button class="logout-button" id="logout-button" type="button">ログアウト</button>
   </aside>
 
@@ -1664,6 +1879,8 @@ const haikuData = [
   { name: "St. Petersburg / Florida, USA", lng: -82.6403, lat: 27.7676, haiku: "Oh, red maple leaves,\nThere seem more of you these eves\nThan ever grew on trees.", author: "— Sadakichi Hartmann", theme: "海外・秋", color: "#e8d9a0", language: "en", international: true },
 ];
 
+setupInkIntro();
+
 const map = new mapboxgl.Map({
   container: 'map',
   style: {
@@ -1772,6 +1989,21 @@ function renderHaikuText(target, text) {
     target.append(document.createTextNode(line));
     if (index < lines.length - 1) target.append(document.createElement('br'));
   });
+}
+
+function setupInkIntro() {
+  const intro = document.getElementById('ink-intro');
+  if (!intro) return;
+  let removed = false;
+  const finish = () => {
+    if (removed) return;
+    removed = true;
+    intro.remove();
+  };
+  intro.addEventListener('animationend', event => {
+    if (event.target === intro) finish();
+  });
+  window.setTimeout(finish, 4700);
 }
 
 function setupComposeForm() {
@@ -2152,8 +2384,9 @@ function updateReplyArea(h) {
 
   resetReplyForm();
   document.getElementById('reply-count').textContent = String(replies.length);
-  document.getElementById('reply-summary').hidden = isOwnHaiku;
-  document.getElementById('reply-area').hidden = isOwnHaiku;
+  document.getElementById('reply-summary').hidden = false;
+  document.getElementById('reply-area').hidden = false;
+  document.getElementById('reply-form').hidden = isOwnHaiku;
   renderReplies(replies);
 }
 
@@ -2177,15 +2410,42 @@ function renderReplies(replies) {
 
   orderedReplies.forEach(reply => {
     const user = getCurrentUser();
+    const profile = getAuthorProfile(reply);
     const likedKey = user ? `${user.id}:${reply.id}` : reply.id;
     const item = document.createElement('article');
     item.className = 'reply-item';
     const haiku = document.createElement('div');
     haiku.className = 'reply-haiku';
     renderHaikuText(haiku, reply.haiku);
+    const authorWrap = document.createElement('div');
+    authorWrap.className = 'reply-author-wrap';
+    const iconControl = document.createElement(
+      user && profile.id !== user.id ? 'button' : 'span'
+    );
+    iconControl.className = 'reply-author-icon';
+    if (iconControl instanceof HTMLButtonElement) {
+      iconControl.type = 'button';
+      const isFriend = getFriendIds(user.id).includes(profile.id);
+      iconControl.classList.toggle('added', isFriend);
+      iconControl.setAttribute(
+        'aria-label',
+        isFriend
+          ? `${profile.displayName}を俳友から解除`
+          : `${profile.displayName}を俳友に追加`
+      );
+      iconControl.addEventListener('click', () => {
+        toggleFriendById(profile.id);
+        renderReplies(getReplies(getHaikuId(currentHaiku)));
+      });
+    }
+    const icon = document.createElement('span');
+    icon.className = 'user-icon';
+    renderUserIcon(icon, profile);
+    iconControl.append(icon);
     const author = document.createElement('div');
     author.className = 'reply-author';
-    author.textContent = reply.author;
+    author.textContent = `— ${profile.displayName}`;
+    authorWrap.append(iconControl, author);
     const okashiButton = document.createElement('button');
     okashiButton.className = 'reply-okashi-button';
     okashiButton.type = 'button';
@@ -2199,7 +2459,7 @@ function renderReplies(replies) {
     okashiButton.addEventListener('click', () => toggleReplyOkashi(reply.id));
     const footer = document.createElement('div');
     footer.className = 'reply-item-footer';
-    footer.append(author, okashiButton);
+    footer.append(authorWrap, okashiButton);
     item.append(haiku, footer);
     list.append(item);
   });
@@ -2422,6 +2682,7 @@ function setupAccountSystem() {
   });
   document.getElementById('logout-button').addEventListener('click', logout);
   document.getElementById('friend-button').addEventListener('click', toggleCurrentFriend);
+  document.getElementById('profile-friends-toggle').addEventListener('click', toggleFriendList);
   document.getElementById('delete-haiku-button').addEventListener('click', deleteCurrentHaiku);
 
   document.getElementById('compose-author').readOnly = true;
@@ -2655,6 +2916,18 @@ function toggleProfilePanel() {
 function closeProfilePanel() {
   document.getElementById('profile-panel').classList.remove('visible');
   document.getElementById('account-button').setAttribute('aria-expanded', 'false');
+}
+
+function toggleFriendList() {
+  const section = document.getElementById('friends-section');
+  const button = document.getElementById('profile-friends-toggle');
+  const willOpen = section.hidden;
+  section.hidden = !willOpen;
+  button.setAttribute('aria-expanded', String(willOpen));
+  if (willOpen) {
+    renderFriendList();
+    requestAnimationFrame(() => section.scrollIntoView({ block: 'nearest' }));
+  }
 }
 
 function renderProfilePanel() {
@@ -2903,7 +3176,11 @@ function getAuthorProfile(h) {
 function getProfileById(profileId) {
   if (usersStore[profileId]) return usersStore[profileId];
   const haiku = haikuData.find(item => getAuthorProfile(item).id === profileId);
-  return haiku ? getAuthorProfile(haiku) : null;
+  if (haiku) return getAuthorProfile(haiku);
+  const reply = Object.values(replyStore)
+    .flatMap(replies => Array.isArray(replies) ? replies : [])
+    .find(item => getAuthorProfile(item).id === profileId);
+  return reply ? getAuthorProfile(reply) : null;
 }
 
 function simpleHash(text) {
@@ -2919,17 +3196,22 @@ function getFriendIds(userId) {
 }
 
 function toggleCurrentFriend() {
-  const user = getCurrentUser();
   const profileId = document.getElementById('friend-button').dataset.profileId;
-  if (!user || !profileId || profileId === user.id) return;
+  toggleFriendById(profileId);
+}
+
+function toggleFriendById(profileId) {
+  const user = getCurrentUser();
+  if (!user || !profileId || profileId === user.id) return false;
   const friendIds = getFriendIds(user.id);
   const index = friendIds.indexOf(profileId);
   if (index >= 0) friendIds.splice(index, 1);
   else friendIds.push(profileId);
   friendsStore[user.id] = friendIds;
   persistAccountState();
-  updateCardAuthor(currentHaiku);
   renderProfilePanel();
+  if (currentHaiku) updateCardAuthor(currentHaiku);
+  return true;
 }
 
 function renderFriendList() {
