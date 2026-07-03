@@ -975,130 +975,389 @@
     #reply-message.warn { color: #e8a0a0; }
 
     #ink-intro {
+      --intro-exit-delay: 3150ms;
+      --intro-exit-duration: 650ms;
+      --brush-delay: 120ms;
+      --brush-duration: 1450ms;
+      --stroke-delay: 280ms;
+      --stroke-duration: 1320ms;
+      --drop-delay: 1030ms;
+      --drop-duration: 780ms;
+      --pool-delay: 1300ms;
+      --pool-duration: 1450ms;
+      --map-delay: 1580ms;
+      --map-duration: 1280ms;
+      --copy-delay: 2450ms;
+      --copy-duration: 720ms;
       position: fixed;
       inset: 0;
       z-index: 1000;
       overflow: hidden;
-      background: #f2ede1;
+      isolation: isolate;
+      background: #eee7d8;
+      color: #181512;
       pointer-events: all;
-      animation: inkIntroFade 4.2s cubic-bezier(0.7, 0, 0.25, 1) forwards;
+      animation: introDissolve var(--intro-exit-duration) ease var(--intro-exit-delay) forwards;
     }
 
-    .intro-title {
+    #ink-intro.is-skipping {
+      animation: skipIntro 260ms ease forwards;
+    }
+
+    .intro-paper {
       position: absolute;
-      left: 7vw;
-      bottom: 8vh;
-      z-index: 4;
-      color: rgba(24, 20, 17, 0.74);
-      font-family: 'Shippori Mincho', serif;
-      font-size: clamp(22px, 3vw, 42px);
-      letter-spacing: 0.28em;
-      animation: introTitle 4.2s ease forwards;
+      inset: 0;
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0.11;
+      mix-blend-mode: multiply;
+      pointer-events: none;
+    }
+
+    .intro-vignette {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      background:
+        radial-gradient(ellipse at 50% 46%, transparent 25%, rgba(91, 71, 45, 0.07) 100%),
+        linear-gradient(105deg, rgba(255,255,255,0.28), transparent 32%, rgba(74,55,35,0.04));
+      pointer-events: none;
+    }
+
+    .intro-skip {
+      position: absolute;
+      z-index: 12;
+      top: max(22px, env(safe-area-inset-top));
+      right: max(24px, env(safe-area-inset-right));
+      padding: 7px 2px 6px 12px;
+      border: 0;
+      border-bottom: 1px solid rgba(45, 39, 32, 0.25);
+      background: transparent;
+      color: rgba(38, 32, 26, 0.58);
+      font-family: 'Noto Serif JP', serif;
+      font-size: 9px;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .intro-skip:hover {
+      color: #171310;
+      border-color: rgba(45, 39, 32, 0.62);
     }
 
     .intro-brush {
       position: absolute;
-      z-index: 5;
-      left: -42vw;
-      top: 15vh;
-      width: min(58vw, 620px);
-      filter: drop-shadow(0 18px 16px rgba(0, 0, 0, 0.24));
-      transform: rotate(-8deg);
-      transform-origin: 80% 50%;
-      animation: brushSweep 1.65s cubic-bezier(0.36, 0.02, 0.3, 1) 0.18s forwards;
+      z-index: 9;
+      left: -54vw;
+      top: 14vh;
+      width: min(64vw, 720px);
+      opacity: 0;
+      filter: drop-shadow(0 20px 15px rgba(24, 16, 10, 0.24));
+      transform: translate3d(0, 0, 0) rotate(-11deg) scale(1.08);
+      transform-origin: 82% 52%;
+      will-change: left, top, transform, opacity;
+      animation: brushAction var(--brush-duration) cubic-bezier(0.3, 0, 0.18, 1) var(--brush-delay) forwards;
     }
 
-    .intro-brush svg {
+    .intro-brush svg,
+    .intro-stroke,
+    .intro-world {
       display: block;
       width: 100%;
       height: auto;
     }
 
-    .ink-trail {
-      position: absolute;
-      z-index: 2;
-      left: 5vw;
-      top: 43vh;
-      width: 0;
-      height: clamp(42px, 8vw, 94px);
-      border-radius: 52% 38% 44% 55%;
-      background:
-        radial-gradient(circle at 13% 45%, #0d0c0b 0 22%, transparent 24%),
-        linear-gradient(90deg, #0d0c0b 0%, #171412 62%, #050505 100%);
-      filter: blur(1.5px);
-      transform: rotate(-2deg);
-      animation: trailDraw 1.5s cubic-bezier(0.34, 0.03, 0.27, 1) 0.38s forwards;
-    }
-
-    .ink-drop {
+    .intro-stroke {
       position: absolute;
       z-index: 3;
-      left: 68vw;
-      top: 45vh;
-      width: 18px;
-      height: 18px;
-      border-radius: 50% 44% 52% 47%;
-      background: #050505;
-      opacity: 0;
-      animation: inkDrop 0.72s cubic-bezier(0.3, 0, 0.6, 1) 1.22s forwards;
+      left: -4vw;
+      top: 27vh;
+      width: 108vw;
+      height: 35vh;
+      overflow: visible;
+      filter: url(#stroke-roughen);
+      transform: rotate(-1.7deg);
     }
 
-    .ink-spread {
+    .intro-stroke-main,
+    .intro-stroke-dry {
+      fill: none;
+      stroke-linecap: round;
+      stroke-dasharray: 1550;
+      stroke-dashoffset: 1550;
+      animation: drawInkStroke var(--stroke-duration) cubic-bezier(0.26, 0.02, 0.2, 1) var(--stroke-delay) forwards;
+    }
+
+    .intro-stroke-main {
+      stroke: #080706;
+      stroke-width: 112;
+    }
+
+    .intro-stroke-dry {
+      stroke: rgba(59, 49, 39, 0.46);
+      stroke-width: 24;
+      stroke-dasharray: 1480 70;
+      stroke-dashoffset: 1550;
+      transform: translateY(52px);
+    }
+
+    .intro-droplets {
       position: absolute;
-      z-index: 3;
-      left: 66vw;
-      top: 67vh;
-      width: 74px;
-      height: 66px;
-      border-radius: 42% 58% 46% 54%;
-      background:
-        radial-gradient(circle at 38% 36%, #25211d 0 8%, #090807 42%, #000 72%);
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+
+    .ink-droplet {
+      position: absolute;
+      top: 48vh;
+      width: var(--drop-size);
+      height: calc(var(--drop-size) * 1.08);
+      border-radius: 48% 52% 57% 43%;
+      background: #090807;
       opacity: 0;
-      transform: translate(-50%, -50%) scale(0.05);
-      animation: inkSpread 2.05s cubic-bezier(0.62, 0, 0.2, 1) 1.58s forwards;
+      transform: translateY(-15px) scale(0.3);
+      animation: fallInkDrop var(--drop-duration) cubic-bezier(0.35, 0, 0.7, 0.82) var(--drop-delay) forwards;
     }
 
-    @keyframes brushSweep {
-      0% { left: -42vw; top: 15vh; transform: rotate(-9deg) scale(1.18); }
-      58% { transform: rotate(-5deg) scale(1.22); }
-      100% { left: 72vw; top: 23vh; transform: rotate(4deg) scale(1.12); }
+    .ink-droplet::after {
+      content: '';
+      position: absolute;
+      left: 50%;
+      top: -44px;
+      width: 2px;
+      height: 48px;
+      background: linear-gradient(transparent, rgba(6, 5, 5, 0.82));
+      transform: translateX(-50%);
     }
 
-    @keyframes trailDraw {
-      0% { width: 0; opacity: 0; }
+    .ink-droplet:nth-child(1) { left: 61vw; --drop-size: 14px; }
+    .ink-droplet:nth-child(2) { left: 68vw; --drop-size: 9px; animation-delay: calc(var(--drop-delay) + 140ms); }
+    .ink-droplet:nth-child(3) { left: 76vw; --drop-size: 18px; animation-delay: calc(var(--drop-delay) + 70ms); }
+
+    .ink-pool {
+      position: absolute;
+      z-index: 4;
+      left: 68%;
+      top: 67%;
+      width: 120px;
+      height: 78px;
+      border-radius: 44% 56% 41% 59% / 54% 45% 55% 46%;
+      background:
+        radial-gradient(ellipse at 39% 42%, #29231d 0 4%, #0d0b09 40%, #030303 74%);
+      opacity: 0;
+      filter: blur(1px);
+      transform: translate(-50%, -50%) scale(0.08);
+      will-change: transform, opacity, filter;
+      animation: poolBleed var(--pool-duration) cubic-bezier(0.46, 0, 0.2, 1) var(--pool-delay) forwards;
+    }
+
+    .ink-pool::before,
+    .ink-pool::after {
+      content: '';
+      position: absolute;
+      border-radius: 50%;
+      background: rgba(5, 5, 4, 0.72);
+      filter: blur(2px);
+    }
+
+    .ink-pool::before {
+      inset: 18% -11% -13% 24%;
+      transform: rotate(17deg);
+    }
+
+    .ink-pool::after {
+      inset: -12% 38% 25% -8%;
+      transform: rotate(-11deg);
+    }
+
+    .intro-map-wrap {
+      position: absolute;
+      z-index: 6;
+      left: 50%;
+      top: 53%;
+      width: min(72vw, 900px);
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.7);
+      filter: blur(17px);
+      will-change: transform, opacity, filter;
+      animation: mapSolidify var(--map-duration) cubic-bezier(0.34, 0, 0.18, 1) var(--map-delay) forwards;
+    }
+
+    .world-continent {
+      fill: #11100e;
+      filter: url(#map-bleed);
+    }
+
+    .map-wash {
+      fill: none;
+      stroke: rgba(35, 30, 24, 0.28);
+      stroke-width: 10;
+      stroke-linecap: round;
+      filter: blur(6px);
+    }
+
+    .map-splatter {
+      fill: rgba(16, 14, 12, 0.56);
+      filter: blur(0.7px);
+    }
+
+    .intro-copy {
+      position: absolute;
+      z-index: 10;
+      left: clamp(28px, 6vw, 92px);
+      bottom: clamp(34px, 7vh, 78px);
+      opacity: 0;
+      transform: translateY(10px);
+      animation: revealIntroCopy var(--copy-duration) ease var(--copy-delay) forwards;
+    }
+
+    .intro-name {
+      display: flex;
+      align-items: center;
+      gap: 13px;
+      color: #171411;
+      font-family: 'Shippori Mincho', serif;
+      font-size: clamp(24px, 3.2vw, 46px);
+      font-weight: 600;
+      letter-spacing: 0.22em;
+      line-height: 1;
+    }
+
+    .intro-seal {
+      width: 8px;
+      height: 8px;
+      flex: 0 0 8px;
+      background: #7f2c25;
+      transform: rotate(5deg);
+    }
+
+    .intro-tagline {
+      margin-top: 13px;
+      color: rgba(45, 39, 33, 0.64);
+      font-family: 'Noto Serif JP', serif;
+      font-size: clamp(10px, 1.2vw, 14px);
+      letter-spacing: 0.26em;
+    }
+
+    @keyframes brushAction {
+      0% {
+        left: -54vw;
+        top: 13vh;
+        opacity: 0;
+        transform: rotate(-13deg) scale(1.06);
+      }
       8% { opacity: 1; }
-      100% { width: 69vw; opacity: 1; }
+      30% { transform: rotate(-8deg) scale(1.14, 1.08); }
+      58% {
+        top: 20vh;
+        transform: rotate(-3deg) scale(1.2, 1.04);
+      }
+      79% { transform: rotate(2deg) scale(1.08, 1.12); }
+      100% {
+        left: 82vw;
+        top: 16vh;
+        opacity: 1;
+        transform: rotate(9deg) scale(1.03);
+      }
     }
 
-    @keyframes inkDrop {
-      0% { opacity: 0; transform: translateY(-8vh) scale(0.4); }
-      35% { opacity: 1; }
-      100% { opacity: 1; transform: translateY(22vh) scale(1.35); }
+    @keyframes drawInkStroke {
+      0% { stroke-dashoffset: 1550; stroke-width: 66; opacity: 0; }
+      8% { opacity: 1; }
+      46% { stroke-width: 126; }
+      76% { stroke-width: 98; }
+      100% { stroke-dashoffset: 0; stroke-width: 108; opacity: 0.96; }
     }
 
-    @keyframes inkSpread {
-      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.05); }
-      9% { opacity: 1; }
-      64% { opacity: 1; transform: translate(-50%, -50%) scale(23); }
-      100% { opacity: 0; transform: translate(-50%, -50%) scale(31); }
+    @keyframes fallInkDrop {
+      0% { opacity: 0; transform: translateY(-15px) scale(0.3); }
+      17% { opacity: 1; }
+      75% { opacity: 1; transform: translateY(18vh) scale(1); }
+      100% { opacity: 0; transform: translateY(20vh) scale(1.45, 0.45); }
     }
 
-    @keyframes introTitle {
-      0%, 58% { opacity: 0; transform: translateY(12px); }
-      72% { opacity: 0.9; transform: translateY(0); }
-      100% { opacity: 0; }
+    @keyframes poolBleed {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.08); filter: blur(0); }
+      15% { opacity: 0.92; }
+      66% { opacity: 0.84; transform: translate(-50%, -50%) scale(5.8, 4.2); filter: blur(2px); }
+      100% { opacity: 0; transform: translate(-50%, -50%) scale(9.5, 6.8); filter: blur(8px); }
     }
 
-    @keyframes inkIntroFade {
-      0%, 72% { background-color: #f2ede1; }
-      88% { background-color: rgba(242, 237, 225, 0.35); }
-      100% { background-color: transparent; opacity: 0; visibility: hidden; pointer-events: none; }
+    @keyframes mapSolidify {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); filter: blur(17px); }
+      28% { opacity: 0.34; }
+      72% { opacity: 0.88; filter: blur(2.5px); }
+      100% { opacity: 0.9; transform: translate(-50%, -50%) scale(1); filter: blur(0); }
+    }
+
+    @keyframes revealIntroCopy {
+      0% { opacity: 0; transform: translateY(10px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes introDissolve {
+      0% { opacity: 1; }
+      100% { opacity: 0; visibility: hidden; pointer-events: none; }
+    }
+
+    @keyframes skipIntro {
+      to { opacity: 0; visibility: hidden; pointer-events: none; }
+    }
+
+    @media (max-width: 720px) {
+      .intro-brush {
+        width: 92vw;
+        left: -82vw;
+        top: 22vh;
+      }
+
+      .intro-stroke {
+        top: 31vh;
+        height: 27vh;
+      }
+
+      .intro-map-wrap {
+        top: 54%;
+        width: 96vw;
+      }
+
+      .intro-copy {
+        bottom: max(42px, calc(env(safe-area-inset-bottom) + 24px));
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
       #ink-intro {
-        animation-duration: 0.01ms;
+        --intro-exit-delay: 1100ms !important;
+        --intro-exit-duration: 420ms !important;
       }
+
+      .intro-brush,
+      .intro-stroke,
+      .intro-droplets,
+      .ink-pool {
+        display: none;
+      }
+
+      .intro-map-wrap {
+        opacity: 0.74;
+        transform: translate(-50%, -50%) scale(1);
+        filter: blur(0);
+        animation: reducedMapFade 520ms ease 80ms both;
+      }
+
+      .intro-copy {
+        animation: revealIntroCopy 420ms ease 360ms forwards;
+      }
+    }
+
+    @keyframes reducedMapFade {
+      from { opacity: 0; }
+      to { opacity: 0.74; }
     }
 
     .card-close {
@@ -1471,31 +1730,101 @@
 </head>
 <body>
 
-<div id="ink-intro" aria-hidden="true">
-  <div class="ink-trail"></div>
-  <div class="ink-drop"></div>
-  <div class="ink-spread"></div>
+<div id="ink-intro" role="dialog" aria-modal="true" aria-label="俳句GOのオープニング">
+  <svg class="intro-paper" aria-hidden="true">
+    <filter id="paper-noise">
+      <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="3" seed="8"/>
+      <feColorMatrix type="saturate" values="0"/>
+    </filter>
+    <rect width="100%" height="100%" filter="url(#paper-noise)" opacity=".65"/>
+  </svg>
+  <div class="intro-vignette"></div>
+  <button class="intro-skip" id="intro-skip" type="button">skip</button>
+
+  <svg class="intro-stroke" viewBox="0 0 1400 430" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <filter id="stroke-roughen" x="-10%" y="-35%" width="120%" height="180%">
+        <feTurbulence type="fractalNoise" baseFrequency=".012 .09" numOctaves="2" seed="14" result="noise"/>
+        <feDisplacementMap in="SourceGraphic" in2="noise" scale="18" xChannelSelector="R" yChannelSelector="G"/>
+      </filter>
+    </defs>
+    <path class="intro-stroke-main" d="M-90 224 C180 190 350 260 578 218 C824 173 1040 238 1490 178"/>
+    <path class="intro-stroke-dry" d="M-74 218 C205 184 364 254 592 214 C833 171 1051 230 1472 181"/>
+  </svg>
+
   <div class="intro-brush">
-    <svg viewBox="0 0 760 190" role="presentation">
+    <svg viewBox="0 0 860 220" role="presentation">
       <defs>
-        <linearGradient id="brush-handle" x1="0" x2="1">
-          <stop offset="0" stop-color="#4d1f14"/>
-          <stop offset="0.48" stop-color="#a96e3f"/>
-          <stop offset="1" stop-color="#3b1710"/>
+        <linearGradient id="brush-handle" x1="0" x2="1" y1=".35" y2=".65">
+          <stop offset="0" stop-color="#30140f"/>
+          <stop offset=".18" stop-color="#7d482c"/>
+          <stop offset=".48" stop-color="#b47b4d"/>
+          <stop offset=".74" stop-color="#6b3925"/>
+          <stop offset="1" stop-color="#25100d"/>
         </linearGradient>
         <linearGradient id="brush-bristle" x1="0" x2="1">
-          <stop offset="0" stop-color="#2d2924"/>
-          <stop offset="0.7" stop-color="#090807"/>
+          <stop offset="0" stop-color="#4a4136"/>
+          <stop offset=".24" stop-color="#201d19"/>
+          <stop offset="0.72" stop-color="#080706"/>
           <stop offset="1" stop-color="#000"/>
         </linearGradient>
+        <linearGradient id="brush-ferrule" x1="0" x2="1">
+          <stop offset="0" stop-color="#8b7652"/>
+          <stop offset=".45" stop-color="#d0bd8c"/>
+          <stop offset="1" stop-color="#625238"/>
+        </linearGradient>
       </defs>
-      <path d="M24 80 Q42 48 82 45 L542 64 Q584 68 600 87 Q575 110 536 111 L80 121 Q39 122 24 92Z" fill="url(#brush-handle)"/>
-      <path d="M520 61 Q594 52 642 72 L650 116 Q585 126 520 112Z" fill="#b9a47a"/>
-      <path d="M636 69 Q704 72 746 104 Q704 133 639 120 Q620 96 636 69Z" fill="url(#brush-bristle)"/>
-      <path d="M691 82 Q729 92 756 107 Q727 109 681 101Z" fill="#030303" opacity=".9"/>
+      <path d="M25 91 Q43 52 92 48 L590 70 Q637 74 658 98 Q631 128 584 127 L88 137 Q39 136 22 106Z" fill="url(#brush-handle)"/>
+      <path d="M66 65 Q220 82 432 82" fill="none" stroke="rgba(255,235,199,.19)" stroke-width="7" stroke-linecap="round"/>
+      <path d="M568 66 Q648 57 707 82 L716 137 Q638 151 569 127Z" fill="url(#brush-ferrule)"/>
+      <path d="M588 70 Q595 104 586 130 M615 65 Q622 103 614 136 M647 65 Q654 104 647 140 M679 72 Q684 103 680 136" fill="none" stroke="rgba(72,55,35,.35)" stroke-width="3"/>
+      <path d="M697 80 Q784 78 849 121 Q788 164 701 140 Q674 111 697 80Z" fill="url(#brush-bristle)"/>
+      <path d="M742 91 Q813 105 858 124 Q807 129 735 116Z" fill="#020202" opacity=".96"/>
+      <path d="M731 136 Q790 153 832 135 Q789 166 718 146Z" fill="#0b0908" opacity=".8"/>
     </svg>
   </div>
-  <div class="intro-title">俳句GO</div>
+
+  <div class="intro-droplets" aria-hidden="true">
+    <span class="ink-droplet"></span>
+    <span class="ink-droplet"></span>
+    <span class="ink-droplet"></span>
+  </div>
+  <div class="ink-pool" aria-hidden="true"></div>
+
+  <div class="intro-map-wrap">
+    <svg class="intro-world" viewBox="0 0 1000 470" role="img" aria-label="墨で描かれた抽象的な世界地図">
+      <defs>
+        <filter id="map-bleed" x="-8%" y="-10%" width="116%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency=".018" numOctaves="3" seed="21" result="mapNoise"/>
+          <feDisplacementMap in="SourceGraphic" in2="mapNoise" scale="13" xChannelSelector="R" yChannelSelector="B" result="roughMap"/>
+          <feGaussianBlur in="roughMap" stdDeviation="1.1"/>
+        </filter>
+      </defs>
+      <path class="map-wash" d="M101 200 C202 89 346 67 465 124 C580 71 767 93 903 194"/>
+      <g class="world-continent">
+        <path d="M92 139 C137 85 216 61 292 78 L333 111 L306 143 L266 145 L241 178 L202 183 L176 222 L138 211 L118 181 L82 171Z"/>
+        <path d="M241 221 L282 234 L311 279 L297 326 L273 374 L249 416 L230 377 L237 333 L214 294 L216 251Z"/>
+        <path d="M343 88 L373 52 L410 58 L428 84 L399 103 L360 101Z"/>
+        <path d="M431 129 L492 97 L558 109 L592 93 L665 111 L702 96 L768 118 L842 130 L912 168 L886 196 L828 201 L789 184 L745 207 L696 194 L658 219 L615 197 L570 208 L537 179 L496 183 L463 158 L421 158Z"/>
+        <path d="M500 188 L558 190 L598 224 L607 278 L580 326 L548 365 L520 333 L509 285 L480 246Z"/>
+        <path d="M610 207 L651 217 L675 248 L659 284 L632 268 L617 239Z"/>
+        <path d="M770 306 L814 283 L865 298 L899 330 L873 360 L823 365 L782 342Z"/>
+        <path d="M910 216 L925 228 L919 247 L905 238Z"/>
+      </g>
+      <g class="map-splatter">
+        <circle cx="73" cy="225" r="4"/><circle cx="113" cy="101" r="3"/><circle cx="318" cy="61" r="3.5"/>
+        <circle cx="391" cy="116" r="2.5"/><circle cx="448" cy="208" r="4"/><circle cx="605" cy="91" r="3"/>
+        <circle cx="731" cy="228" r="4.5"/><circle cx="881" cy="112" r="2.8"/><circle cx="939" cy="193" r="4"/>
+        <circle cx="902" cy="376" r="3.2"/><circle cx="745" cy="357" r="2.4"/><circle cx="588" cy="383" r="3"/>
+        <circle cx="319" cy="403" r="2.5"/><circle cx="198" cy="267" r="3.4"/>
+      </g>
+    </svg>
+  </div>
+
+  <div class="intro-copy">
+    <div class="intro-name"><span class="intro-seal"></span><span id="intro-site-name">俳句GO</span></div>
+    <div class="intro-tagline" id="intro-tagline">ことばは、世界を旅する。</div>
+  </div>
 </div>
 
 <div id="map"></div>
@@ -1763,6 +2092,12 @@ const firebaseConfig = {
   messagingSenderId: '340008511163',
   appId: '1:340008511163:web:3df67ebc10131903716b9e',
 };
+const INTRO_CONFIG = Object.freeze({
+  siteName: '俳句GO',
+  tagline: 'ことばは、世界を旅する。',
+  duration: 3800,
+  sessionKey: 'haikugo_intro_seen_v3',
+});
 const CLOUD_ENABLED = Boolean(window.firebase);
 if (CLOUD_ENABLED && !firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const cloudAuth = CLOUD_ENABLED ? firebase.auth() : null;
@@ -1994,16 +2329,61 @@ function renderHaikuText(target, text) {
 function setupInkIntro() {
   const intro = document.getElementById('ink-intro');
   if (!intro) return;
+  const forceReplay = new URLSearchParams(window.location.search).get('intro') === '1';
+  let alreadySeen = false;
+  try {
+    alreadySeen = sessionStorage.getItem(INTRO_CONFIG.sessionKey) === 'true';
+  } catch {
+    alreadySeen = false;
+  }
+  if (alreadySeen && !forceReplay) {
+    intro.remove();
+    return;
+  }
+
+  document.getElementById('intro-site-name').textContent = INTRO_CONFIG.siteName;
+  document.getElementById('intro-tagline').textContent = INTRO_CONFIG.tagline;
+  const scale = Math.max(0.65, INTRO_CONFIG.duration / 3800);
+  const timings = {
+    '--intro-exit-delay': 3150,
+    '--intro-exit-duration': 650,
+    '--brush-delay': 120,
+    '--brush-duration': 1450,
+    '--stroke-delay': 280,
+    '--stroke-duration': 1320,
+    '--drop-delay': 1030,
+    '--drop-duration': 780,
+    '--pool-delay': 1300,
+    '--pool-duration': 1450,
+    '--map-delay': 1580,
+    '--map-duration': 1280,
+    '--copy-delay': 2450,
+    '--copy-duration': 720,
+  };
+  Object.entries(timings).forEach(([property, value]) => {
+    intro.style.setProperty(property, `${Math.round(value * scale)}ms`);
+  });
+
+  try {
+    sessionStorage.setItem(INTRO_CONFIG.sessionKey, 'true');
+  } catch {
+    // The intro still works when session storage is unavailable.
+  }
+
   let removed = false;
   const finish = () => {
     if (removed) return;
     removed = true;
     intro.remove();
   };
+  document.getElementById('intro-skip').addEventListener('click', () => {
+    intro.classList.add('is-skipping');
+    window.setTimeout(finish, 280);
+  });
   intro.addEventListener('animationend', event => {
     if (event.target === intro) finish();
   });
-  window.setTimeout(finish, 4700);
+  window.setTimeout(finish, INTRO_CONFIG.duration + 500);
 }
 
 function setupComposeForm() {
