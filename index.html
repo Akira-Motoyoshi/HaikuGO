@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
   <meta http-equiv="Pragma" content="no-cache">
   <meta http-equiv="Expires" content="0">
@@ -22,12 +22,14 @@
       background: #0a0a0f;
       color: #e8e0d0;
       height: 100vh;
+      height: 100dvh;
       overflow: hidden;
     }
 
     #map {
       width: 100vw;
       height: 100vh;
+      height: 100dvh;
       position: absolute;
       top: 0; left: 0;
     }
@@ -220,7 +222,8 @@
     }
 
     .auth-submit,
-    .profile-save {
+    .profile-save,
+    .auth-demo {
       min-height: 42px;
       border: 1px solid rgba(232, 217, 160, 0.34);
       border-radius: 2px;
@@ -242,6 +245,45 @@
       text-align: left;
       cursor: pointer;
     }
+
+    .auth-demo {
+      width: 100%;
+      margin-top: 12px;
+      background: transparent;
+      border-color: rgba(144, 196, 232, 0.34);
+      color: #90c4e8;
+    }
+
+    .auth-demo-note {
+      margin-top: 9px;
+      color: #5a6470;
+      font-size: 9px;
+      line-height: 1.6;
+      letter-spacing: 0.11em;
+      text-align: center;
+    }
+
+    #demo-login-button {
+      display: none;
+      min-height: 40px;
+      border: 1px solid rgba(144, 196, 232, 0.34);
+      border-radius: 999px;
+      background: rgba(10, 9, 16, 0.72);
+      color: #90c4e8;
+      font-family: 'Noto Serif JP', serif;
+      font-size: 10px;
+      letter-spacing: 0.15em;
+      padding: 0 14px;
+      cursor: pointer;
+      backdrop-filter: blur(12px);
+    }
+
+    body.demo-mode #demo-login-button { display: block; }
+    body.demo-mode #compose-toggle::after { content: '（要ログイン）'; }
+    body.demo-mode #okashi-button,
+    body.demo-mode #friend-button,
+    body.demo-mode #reply-form,
+    body.demo-mode #delete-haiku-button { display: none !important; }
 
     #auth-message,
     #profile-message {
@@ -1670,6 +1712,11 @@
       .header-right { gap: 8px; }
       #account-name { display: none; }
       #account-button { padding-right: 6px; }
+      #demo-login-button {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 10px;
+      }
 
       #profile-panel {
         top: 76px;
@@ -1725,6 +1772,19 @@
       .reply-footer { grid-template-columns: 1fr; }
 
       .reply-submit { min-height: 34px; }
+
+      button,
+      .haiku-marker,
+      .category-options label {
+        min-height: 44px;
+      }
+
+      #profile-panel,
+      #ranking-panel,
+      #compose,
+      #card {
+        max-height: calc(100dvh - 96px);
+      }
     }
   </style>
 </head>
@@ -1854,6 +1914,8 @@
       <button class="auth-secondary" id="forgot-password" type="button">パスワードを忘れた場合</button>
       <button class="auth-submit" id="auth-submit" type="submit">ログイン</button>
     </form>
+    <button class="auth-demo" id="auth-demo" type="button">まず見学する</button>
+    <div class="auth-demo-note">公開作品の閲覧はアカウント不要です。投稿・返句・「をかし」はログイン後に利用できます。</div>
   </div>
 </div>
 
@@ -1868,6 +1930,7 @@
         場所が俳句になる。<br>
         ピンをクリックして、その土地の言葉を読む。
       </div>
+      <button id="demo-login-button" type="button">ログインして参加</button>
       <button id="account-button" type="button" aria-expanded="false" aria-controls="profile-panel">
         <span class="user-icon" id="account-icon">🌿</span>
         <span id="account-name"></span>
@@ -2128,6 +2191,7 @@ const FRIENDS_STORAGE_KEY = 'haiku_go_friends_v1';
 let usersStore = readJson(USERS_STORAGE_KEY, {});
 let friendsStore = readJson(FRIENDS_STORAGE_KEY, {});
 let currentUserId = VERIFY_ONLY ? null : localStorage.getItem(SESSION_STORAGE_KEY);
+let demoMode = false;
 let authMode = 'login';
 let okashiEvents = Array.isArray(readJson(OKASHI_EVENTS_KEY, []))
   ? readJson(OKASHI_EVENTS_KEY, [])
@@ -3049,6 +3113,8 @@ function setupAccountSystem() {
   document.getElementById('login-tab').addEventListener('click', () => setAuthMode('login'));
   document.getElementById('signup-tab').addEventListener('click', () => setAuthMode('signup'));
   document.getElementById('auth-form').addEventListener('submit', handleAuthSubmit);
+  document.getElementById('auth-demo').addEventListener('click', enterDemoMode);
+  document.getElementById('demo-login-button').addEventListener('click', exitDemoMode);
   document.getElementById('forgot-password').addEventListener('click', sendPasswordReset);
   document.getElementById('account-button').addEventListener('click', toggleProfilePanel);
   document.querySelector('.profile-close').addEventListener('click', closeProfilePanel);
@@ -3078,6 +3144,20 @@ function setupAccountSystem() {
     document.getElementById('auth-message').textContent =
       'オンライン認証を読み込めません。ページを再読み込みしてください。';
   }
+}
+
+function enterDemoMode() {
+  demoMode = true;
+  document.body.classList.add('demo-mode');
+  hideAuthGate();
+  closeProfilePanel();
+  startCloudSync();
+}
+
+function exitDemoMode() {
+  demoMode = false;
+  document.body.classList.remove('demo-mode');
+  showAuthGate();
 }
 
 function setAuthMode(mode) {
@@ -3194,6 +3274,11 @@ async function handleCloudAuthState(firebaseUser) {
   if (!firebaseUser) {
     stopCloudSync();
     currentUserId = null;
+    if (demoMode) {
+      startCloudSync();
+      hideAuthGate();
+      return;
+    }
     showAuthGate();
     return;
   }
@@ -3652,10 +3737,10 @@ function getReceivedOkashi(userId) {
 }
 
 function startCloudSync() {
-  if (!CLOUD_ENABLED || cloudSyncStarted || !currentUserId) return;
+  if (!CLOUD_ENABLED || cloudSyncStarted) return;
   cloudSyncStarted = true;
 
-  cloudUnsubscribers.push(
+  const publicSubscriptions = [
     cloudDb.collection('users').onSnapshot(snapshot => {
       snapshot.forEach(document => {
         usersStore[document.id] = {
@@ -3716,16 +3801,20 @@ function startCloudSync() {
       });
       if (currentHaiku) renderReplies(getReplies(getHaikuId(currentHaiku)));
       renderProfilePanel();
-    }),
-    cloudDb.collection('friendships').doc(currentUserId).onSnapshot(document => {
+    })
+  ];
+  cloudUnsubscribers.push(...publicSubscriptions);
+
+  if (currentUserId) {
+    cloudUnsubscribers.push(cloudDb.collection('friendships').doc(currentUserId).onSnapshot(document => {
       friendsStore[currentUserId] = document.exists && Array.isArray(document.data().friendIds)
         ? document.data().friendIds
         : [];
       renderFriendList();
       renderProfilePanel();
       if (currentHaiku) updateCardAuthor(currentHaiku);
-    })
-  );
+    }));
+  }
 }
 
 function stopCloudSync() {
